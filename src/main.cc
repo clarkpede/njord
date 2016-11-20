@@ -4,6 +4,7 @@
 #include "petscmat.h"
 
 #include "Laplacian.h"
+
 /** This function is used to define the right-hand side of the Poisson equation
  *  to be solved
  */
