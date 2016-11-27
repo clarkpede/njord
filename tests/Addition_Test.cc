@@ -1,6 +1,8 @@
 #include <boost/test/unit_test.hpp>
 #include <petscsys.h>
 
+#include <iostream>
+
 BOOST_AUTO_TEST_SUITE(Addition)
 
 BOOST_AUTO_TEST_CASE( a_plus_b )

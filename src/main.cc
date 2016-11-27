@@ -1,50 +1,157 @@
 #include <math.h>
-#include "petscksp.h"
-#include "petscvec.h"
-#include "petscmat.h"
+#include <petscts.h>
+#include <petscdm.h>
+#include <petscdmda.h>
 
-#include "Laplacian.h"
+#include "Field.h"
+#include "Settings.h"
+#include "InitialSolution.h"
+#include "TimeMarch.h"
+#include "RANSModels.h"
 
-/** This function is used to define the right-hand side of the Poisson equation
- *  to be solved
- */
-double func(double x, double y) {
-  return sin(x*M_PI)*sin(y*M_PI);
-}
+static char help[] = "Solves 2D incompressible RANS equations using SA model.\n\n";
 
+PetscErrorCode SetParams(Parameters*, GridInfo*);
+PetscErrorCode ReportParams(Parameters*, GridInfo*);
+
+// ----------------------------------------------------------------------------
+#undef __FUNCT__
+#define __FUNCT__ "main"
 int main(int argc, char* argv[]) {
-  KSP sles;
-  Mat A;
-  Vec b,x;
-  int its, n;
+  Vec   x,r;      // Solution and residual vectors
+  Mat   J;        // Jacobian matrix
+  DM    da;
+  AppCtx *user;      // User defined work context
+  Parameters param;  // Physical and other parameters
+  GridInfo grid;     // Parameters defining the grid
+  PetscErrorCode ierr;
+  MPI_Comm comm;
 
-  PetscInitialize(&argc, &argv, 0, 0);
+  PetscInitialize(&argc, &argv,(char*)0, help);
+  comm = PETSC_COMM_WORLD;
 
-  n = 10; // Mesh size is 10 by default
-  PetscOptionsGetInt(PETSC_NULL, "-n", &n, 0);
+  // Set up the problem parameters
+  SetParams(&param,&grid);
+  ReportParams(&param,&grid);
 
-  // Setup the problem
-  A = FormLaplacian2d( n );
-  b = FormVecFromFunction2d(n,func);
-  VecDuplicate(b, &x);
+  // Create distributed arrays to manage parallel grid and vectors
+  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
+               PETSC_DECIDE, PETSC_DECIDE, grid.dof, grid.stencil_width,
+               0,0,&da);
+  DMSetApplicationContext(da,&user);
+  DMDASetFieldName(da,0,"x mean velocity");
+  DMDASetFieldName(da,1,"y mean velocity");
+  DMDASetFieldName(da,2,"pressure");
+  DMDASetFieldName(da,3,"turbulent viscosity"); //FIXME: Is this name correct?
 
-  // Set up the solver
-  KSPCreate(PETSC_COMM_WORLD, &sles);
-  KSPSetOperators(sles, A, A);  // Should this include "DIFFERENT_NONZERO_PATTERN"?
-  KSPSetFromOptions(sles);
+  // Create user context and setup initial conditions
+  PetscNew(&user);
+  user->param = &param;
+  user->grid =  &grid;
+  DMSetApplicationContext(da,user);
+  DMCreateGlobalVector(da,&(user->initial_x));
 
-  // Solve
-  KSPSolve(sles, b, x);
+  // Create the initial field
+  DMCreateGlobalVector(da,&(user->initial_x));
+  VecDuplicate(user->initial_x, &(user->x));
+  FormInitialFields(da,user->initial_x,grid.Lx,grid.Ly);
 
-  // Print results
-  KSPGetIterationNumber(sles, &its);
-  PetscPrintf(PETSC_COMM_WORLD, "Solution in %d iterations is \n",its);
-  VecView(x, PETSC_VIEWER_STDOUT_WORLD);
+  // Advance the solution through time
+  TimeMarch(da, user);
 
-  // Clean up and exit
-  MatDestroy(&A); VecDestroy(&b); VecDestroy(&x);
-  KSPDestroy(&sles);
+  // Output to a *.vts file.
+  // XXX: Plots initial x, not final x
+  if(param.write_output) {
+    PetscViewer viewer;
+    PetscViewerVTKOpen(PETSC_COMM_WORLD,param.outfile,FILE_MODE_WRITE,&viewer);
+    VecView(user->initial_x,viewer);
+    PetscViewerDestroy(&viewer);
+  }
+
+  // Cleanup
+  VecDestroy(&user->initial_x);
+  VecDestroy(&user->x);
+  PetscFree(user);
+  DMDestroy(&da);
+  PetscPrintf(PETSC_COMM_WORLD,"Exited successfully.\n");
   PetscFinalize();
   return 0;
+}
+//-----------------------------------------------------------------------------
 
+
+/** Sets up the runtime parameters using the options database
+ *
+ *  See:
+ *  http://www.mcs.anl.gov/petsc/petsc-current/src/snes/examples/tutorials/ex30.c.html
+ *  for an example of how to fill out this function.
+ *
+ * @param param - All runtime parameters will be stored in 'param'
+ * @param grid - Grid specifications will be stored in 'grid'
+ * @return Returns an error if execution fails
+ */
+PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
+  PetscErrorCode ierr, ierr_out = 0;
+  // Parameters
+  PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified runtime options",
+                    __FILE__);{
+    param->nu = 1.0;
+    param->end_time = 1.0;
+    PetscOptionsReal("-T","Duration of the simulation","none",param->end_time,
+                     &(param->end_time),NULL);
+    param->CFL = 0.6;
+    PetscOptionsReal("-CFL","CFL number used for time advancement","none",
+                     param->CFL,&(param->CFL),NULL);
+    strcpy(param->outfile,"output/average_fields.vts");
+    PetscOptionsString("-o","Output solution to a specified *.vts file",
+                       "none",param->outfile,param->outfile, PETSC_MAX_PATH_LEN,
+                       &param->write_output);
+    param->verbose = PETSC_FALSE;
+    PetscOptionsName("-verbose","Print all info during execution.","none",
+                     &(param->verbose));
+  }
+  PetscOptionsEnd();
+
+  // Grid Options
+  PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified grid options",__FILE__); {
+    grid->mx = 32;
+    grid->my = 32;
+    grid->Lx = M_PI;
+    grid->Ly = M_PI;
+    ierr = PetscOptionsInt("-mx","Grid resolution in x-direction","none",
+                           grid->mx,&grid->mx,NULL);
+    ierr = PetscOptionsInt("-my","Grid resolution in y-direction","none",
+                           grid->my,&grid->my,NULL);
+    grid->stencil = DMDA_STENCIL_BOX;
+    grid->bc_x = DM_BOUNDARY_PERIODIC;
+    grid->bc_y = DM_BOUNDARY_PERIODIC;
+    grid->dof = 4;
+    grid->stencil_width = 2;
+  }
+  PetscOptionsEnd();
+  return ierr_out;
+
+}
+
+/** Prints out the relevant parameters, if full output is enabled.
+ *
+ * @param param - Runtime parameters used
+ * @param grid - Grid information
+ * @return Returns an error if execution fails
+ */
+PetscErrorCode ReportParams(Parameters *param, GridInfo *grid) {
+  PetscErrorCode ierr, ierr_out=0;
+
+  if (param->verbose) {
+    PetscPrintf(PETSC_COMM_WORLD,
+                "---------------------BEGIN NJORD PARAM REPORT-------------------\n");
+    if (param->write_output) {
+      PetscPrintf(PETSC_COMM_WORLD,"Writing final solution to: \n");
+      PetscPrintf(PETSC_COMM_WORLD,"    %s", param->outfile);
+    };
+    PetscPrintf(PETSC_COMM_WORLD,"\nGrid: \n");
+    PetscPrintf(PETSC_COMM_WORLD,"    [mx,my]: %D, %D \n", grid->mx, grid->my);
+    PetscPrintf(PETSC_COMM_WORLD,
+                "---------------------END NJORD PARAM REPORT-------------------\n");
+  }
 }
