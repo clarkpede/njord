@@ -4,16 +4,23 @@
  *  Created on: Nov 23, 2016
  *      Author: clarkp
  */
-#include <petscdmda.h>
 
 #ifndef INCLUDE_INITIALSOLUTION_H_
 #define INCLUDE_INITIALSOLUTION_H_
+
+#include <petscdmda.h>
+
+#include "Settings.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-PetscErrorCode FormInitialFields(DM da, Vec x, PetscReal Lx, PetscReal Ly);
+PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user);
+
+PetscErrorCode SetInitialPressure(DM da, Vec U, AppCtx *user);
+
+PetscErrorCode SetInitialVt(DM da, Vec U, AppCtx *user);
 
 #ifdef __cplusplus
 }

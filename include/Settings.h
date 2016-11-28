@@ -32,8 +32,7 @@ typedef struct {
 typedef struct {
   Parameters  *param;    // Runtime parameters
   GridInfo    *grid;     // Grid information
-  Vec         x;         // The vector representing the solution
-  Vec         initial_x; // An initial guess at the mean values
+  Vec         vel, p, vt; // Vectors representing the solution at each time step
 } AppCtx;
 
 #endif /* INCLUDE_SETTINGS_H_ */

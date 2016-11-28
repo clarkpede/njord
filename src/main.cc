@@ -20,7 +20,7 @@ PetscErrorCode ReportParams(Parameters*, GridInfo*);
 int main(int argc, char* argv[]) {
   Vec   x,r;      // Solution and residual vectors
   Mat   J;        // Jacobian matrix
-  DM    da;
+  DM    da_vel, da_p, da_vt;
   AppCtx *user;      // User defined work context
   Parameters param;  // Physical and other parameters
   GridInfo grid;     // Parameters defining the grid
@@ -34,45 +34,59 @@ int main(int argc, char* argv[]) {
   SetParams(&param,&grid);
   ReportParams(&param,&grid);
 
-  // Create distributed arrays to manage parallel grid and vectors
-  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
-               PETSC_DECIDE, PETSC_DECIDE, grid.dof, grid.stencil_width,
-               0,0,&da);
-  DMSetApplicationContext(da,&user);
-  DMDASetFieldName(da,0,"x mean velocity");
-  DMDASetFieldName(da,1,"y mean velocity");
-  DMDASetFieldName(da,2,"pressure");
-  DMDASetFieldName(da,3,"turbulent viscosity"); //FIXME: Is this name correct?
-
   // Create user context and setup initial conditions
   PetscNew(&user);
   user->param = &param;
   user->grid =  &grid;
-  DMSetApplicationContext(da,user);
-  DMCreateGlobalVector(da,&(user->initial_x));
+
+  // Create a distributed array for the velocities
+  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
+               PETSC_DECIDE, PETSC_DECIDE, grid.dof, grid.stencil_width,
+               0,0,&da_vel);
+  DMSetApplicationContext(da_vel,user);
+  DMDASetFieldName(da_vel,0,"x mean velocity");
+  DMDASetFieldName(da_vel,1,"y mean velocity");
+  DMCreateGlobalVector(da_vel,&(user->vel));
+
+  // Create a distributed array for the pressure
+  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
+               PETSC_DECIDE, PETSC_DECIDE, 1, grid.stencil_width,
+               0,0,&da_p);
+  DMSetApplicationContext(da_p,user);
+  DMCreateGlobalVector(da_p,&(user->p));
+
+  // Create a distributed array for the pressure
+  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
+               PETSC_DECIDE, PETSC_DECIDE, 1, grid.stencil_width,
+               0,0,&da_vt);
+  DMSetApplicationContext(da_vt,user);
+  DMCreateGlobalVector(da_vt,&(user->vt));
 
   // Create the initial field
-  DMCreateGlobalVector(da,&(user->initial_x));
-  VecDuplicate(user->initial_x, &(user->x));
-  FormInitialFields(da,user->initial_x,grid.Lx,grid.Ly);
+  SetInitialVelocities(da_vel, user->vel, user);
+  SetInitialPressure(da_p, user->p, user);
+  SetInitialVt(da_vt, user->vt, user);
 
   // Advance the solution through time
-  TimeMarch(da, user);
+  TimeMarch(da_vel, da_p, da_vt, user);
 
   // Output to a *.vts file.
-  // XXX: Plots initial x, not final x
+  // TODO: Plot cell-centered values...
   if(param.write_output) {
     PetscViewer viewer;
     PetscViewerVTKOpen(PETSC_COMM_WORLD,param.outfile,FILE_MODE_WRITE,&viewer);
-    VecView(user->initial_x,viewer);
+    VecView(user->vel,viewer);
     PetscViewerDestroy(&viewer);
   }
 
   // Cleanup
-  VecDestroy(&user->initial_x);
-  VecDestroy(&user->x);
+  VecDestroy(&user->vel);
+  VecDestroy(&user->vt);
+  VecDestroy(&user->p);
   PetscFree(user);
-  DMDestroy(&da);
+  DMDestroy(&da_vel);
+  DMDestroy(&da_vt);
+  DMDestroy(&da_p);
   PetscPrintf(PETSC_COMM_WORLD,"Exited successfully.\n");
   PetscFinalize();
   return 0;
@@ -125,7 +139,7 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
     grid->stencil = DMDA_STENCIL_BOX;
     grid->bc_x = DM_BOUNDARY_PERIODIC;
     grid->bc_y = DM_BOUNDARY_PERIODIC;
-    grid->dof = 4;
+    grid->dof = 2;
     grid->stencil_width = 2;
   }
   PetscOptionsEnd();
@@ -154,4 +168,5 @@ PetscErrorCode ReportParams(Parameters *param, GridInfo *grid) {
     PetscPrintf(PETSC_COMM_WORLD,
                 "---------------------END NJORD PARAM REPORT-------------------\n");
   }
+  return 0;
 }

@@ -9,6 +9,10 @@
 njord
 unit_tests
 
+# Program Output #
+##################
+output/*
+
 # CMake Files #
 ###############
 cmake_install.cmake
@@ -22,12 +26,15 @@ Testing/
 #################
 .cproject
 .project
+.csettings/
 .settings/
 
 # Build folders #
 #################
 debug/
 release/
+Debug/
+Release/
 
 # Packages #
 ############

@@ -9,6 +9,7 @@
 #include "TimeMarch.h"
 #include "Field.h"
 #include "Monitor.h"
+#include "Laplacian.h"
 
 /**
  *
@@ -19,18 +20,19 @@
  * @param ptr - Problem context, as set by SNESSetFunction()
  * @return Returns a zero if the function executes successfully.
  */
+#undef __FUNCT__
+#define __FUNCT__ "FormFunction"
 PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
   AppCtx         *user = (AppCtx*)ptr;
   DM             da;
   PetscInt       i,j,Mx,My,xs,ys,xm,ym;
-  PetscReal      hx,hy,sx,sy;
-  PetscReal      FCu, FDu, FPu, FCv, FDv, FPv;
+  PetscReal      hx,hy;
+  PetscReal      FCu, FDu, FDv, FCv;
   PetscReal      mN, mS, mE, mW;
   PetscReal      uN, uS, uE, uW;
   PetscReal      vN, vS, vE, vW;
   PetscReal      dVdyN, dVdyS, dVdxW, dVdxE;
   PetscReal      dUdxE, dUdxW, dUdyN, dUdyS;
-  PetscScalar    u,uxx,uyy;
   Vec            localX;
   Field          **x, **f;
 
@@ -43,8 +45,8 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
 
   // This is not the usual (Mx-1) because the staggered grid omits one of the
   // nodal points to maintain consistent u,v,p array sizes.
-  hx = user->grid->Lx/(PetscReal)(Mx); sx = 1.0/(hx*hx);
-  hy = user->grid->Ly/(PetscReal)(My); sy = 1.0/(hy*hy);
+  hx = user->grid->Lx/(PetscReal)(Mx);
+  hy = user->grid->Ly/(PetscReal)(My);
 
   /*
        Scatter ghost points to local vector,using the 2-step process
@@ -98,12 +100,6 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
       FCv =  (mN*vN + mS*vS + mE*vE + mW*vW)/(hx*hy);
 
       //------------------------------------------------------------------------
-      // Pressure terms, divided by area
-      //-----------------------------------------------------------------------
-      FPu = -(-x[j][i].p + x[j][i+1].p)/hx;
-      FPv = -(-x[j][i].p + x[j+1][i].p)/hy;
-
-      //------------------------------------------------------------------------
       // Diffusion, divided by the area
       //------------------------------------------------------------------------
       // U momentum equation:
@@ -122,10 +118,8 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
       FDv = user->param->nu * (dVdyN*hx - dVdyS*hx + dVdxE*hy + dVdxE*hy);
       FDv /= (hx*hy);
 
-      f[j][i].u = -FCu + FDu + FPu;
-      f[j][i].v = -FCu + FDu + FPu;
-      f[j][i].p = 0.0;
-      f[j][i].vt = 0.0;
+      f[j][i].u = -FCu + FDu;
+      f[j][i].v = -FCu + FDu;
     }
   }
 
@@ -173,8 +167,7 @@ PetscErrorCode get_dt(DM da, Vec U, PetscReal CFL,
  */
 #undef __FUNCT__
 #define __FUNCT__ "TimeMarch"
-PetscErrorCode TimeMarch(DM da, AppCtx *user) {
-  DM    phi;
+PetscErrorCode TimeMarch(DM da_vel, DM da_p, DM da_vt, AppCtx *user) {
   TS    ts_conv, ts_diff;
   SNES  snes;
   PetscReal dt, time;
@@ -186,17 +179,17 @@ PetscErrorCode TimeMarch(DM da, AppCtx *user) {
   // Set up timestepper
   //---------------------------------------------------------------------------
   TSCreate(PETSC_COMM_WORLD, &ts_conv);
-  TSSetDM(ts_conv, da);
+  TSSetDM(ts_conv, da_vel);
   TSSetProblemType(ts_conv,TS_NONLINEAR);
   TSSetRHSFunction(ts_conv,NULL,FormFunction,user);
   TSSetType(ts_conv, TSEULER);
   TSGetSNES(ts_conv,&snes);
-  TSSetSolution(ts_conv, user->initial_x);
+  TSSetSolution(ts_conv, user->vel);
   if (user->param->verbose) TSMonitorSet(ts_conv,Monitor,NULL,NULL);
 
   // Set the initial time step
   time = 0.0;
-  get_dt(da, user->initial_x, user->param->CFL,
+  get_dt(da_vel, user->vel, user->param->CFL,
          user->grid->Lx, user->grid->Ly, &dt);
   TSSetInitialTimeStep(ts_conv,time,dt);
   TSSetDuration(ts_conv,kMaxSteps,user->param->end_time);
@@ -206,26 +199,22 @@ PetscErrorCode TimeMarch(DM da, AppCtx *user) {
   TSSetFromOptions(ts_conv);
   if (user->param->verbose) TSView(ts_conv,PETSC_VIEWER_STDOUT_SELF);
 
-
-  //---------------------------------------------------------------------------
-  // Set up array for phi
-  //---------------------------------------------------------------------------
-
-
-
   n = 0;
   while (time < user->param->end_time) {
     if (time > 0.0) {
       // Recompute the time step based on the CFL condition
-      get_dt(da, user->initial_x, user->param->CFL,
+      get_dt(da_vel, user->vel, user->param->CFL,
              user->grid->Lx, user->grid->Ly, &dt);
       TSSetTimeStep(ts_conv, dt);
     }
+    TSGetTimeStep(ts_conv,&dt); // Just in case dt is not set exactly
 
-    Monitor(ts_conv,n,time,user->initial_x,NULL);
+    Monitor(ts_conv,n,time,user->vel,NULL);
     TSStep(ts_conv);
 
-    // Compute phi
+    // Solve for the pressure-like term
+    SolveLaplacian(da_vel, da_p, dt, user);
+
     // Correct the fields
 
     time += dt;

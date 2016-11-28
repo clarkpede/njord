@@ -10,7 +10,7 @@
 
 // The field variables
 typedef struct {
-  PetscScalar u,v,p,vt;
+  PetscScalar u,v;
 } Field;
 
 #endif /* INCLUDE_FIELD_H_ */
