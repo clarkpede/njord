@@ -22,8 +22,8 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
   KSPCreate(PETSC_COMM_WORLD, &ksp);
 
   // Set up the linear algebra system
-  KSPSetComputeRHS(ksp,ComputeRHS,&user);
-  KSPSetComputeOperators(ksp, ComputeMatrix, &user);
+  KSPSetComputeRHS(ksp,ComputeRHS,user);
+  KSPSetComputeOperators(ksp, ComputeMatrix, user);
 
   // Set up the reamining KSP settings
   KSPSetDM(ksp, da_p);
