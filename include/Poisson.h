@@ -1,12 +1,12 @@
 /*
- * Laplacian.h
+ * Poisson.h
  *
  *  Created on: Nov 28, 2016
  *      Author: clarkp
  */
 
-#ifndef INCLUDE_LAPLACIAN_H_
-#define INCLUDE_LAPLACIAN_H_
+#ifndef INCLUDE_POISSON_H_
+#define INCLUDE_POISSON_H_
 
 #include <petscdm.h>
 #include <petscdmda.h>
@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
+PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal timestep,
                               AppCtx *user,
                               PetscReal (*opt_func)(PetscReal, PetscReal));
 
@@ -25,4 +25,4 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
 }
 #endif
 
-#endif /* INCLUDE_LAPLACIAN_H_ */
+#endif /* INCLUDE_POISSON_H_ */

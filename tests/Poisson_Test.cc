@@ -8,7 +8,7 @@
 #include <petscdm.h>
 #include <petscdmda.h>
 
-#include "Laplacian.h"
+#include "Poisson.h"
 #include "Settings.h"
 
 struct F{
@@ -96,14 +96,14 @@ PetscErrorCode SetUpExactSolution(DM da, Vec U, AppCtx *user) {
   return 0;
 };
 
-BOOST_FIXTURE_TEST_SUITE(Laplacian, F)
+BOOST_FIXTURE_TEST_SUITE(Poisson, F)
 
 BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Constant_Is_Zero ) {
 
   VecSet(user->vel,1.0);
 
   PetscReal arbitrary_dt = 1.0;
-  SolveLaplacian(da_vel, da_p, arbitrary_dt, user, NULL);
+  SolvePoisson(da_vel, da_p, arbitrary_dt, user, NULL);
 
   PetscScalar tol = 1e-14;
   PetscReal sum;
@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Trig_Is_Close ) {
   SetUpExactSolution(da_p, exact, user);
 
   PetscReal arbitrary_dt = 1.0;
-  SolveLaplacian(da_vel, da_p, arbitrary_dt, user, &test_rhs_func);
+  SolvePoisson(da_vel, da_p, arbitrary_dt, user, &test_rhs_func);
 
   PetscScalar tol = 1e-3;
   PetscScalar norm;
