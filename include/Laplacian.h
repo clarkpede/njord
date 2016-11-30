@@ -18,7 +18,8 @@ extern "C" {
 #endif
 
 PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
-                              AppCtx *user);
+                              AppCtx *user,
+                              PetscReal (*opt_func)(PetscReal, PetscReal));
 
 #ifdef __cplusplus
 }

@@ -23,10 +23,15 @@ FILE(GLOB HEADERS ${CMAKE_SOURCE_DIR}/include/*.h)
 
 # Test files
 enable_testing()
-FILE(GLOB TEST_SOURCES ${CMAKE_SOURCE_DIR}/tests/*.cc)
+FILE(GLOB TEST_SOURCES ${CMAKE_SOURCE_DIR}/src/*.c ${CMAKE_SOURCE_DIR}/src/*.cc ${CMAKE_SOURCE_DIR}/tests/*.cc)
+list(REMOVE_ITEM TEST_SOURCES ${CMAKE_SOURCE_DIR}/src/main.cc)
+
+# Essential: include our directories first otherwise we can get internal headers from some installed path
+include_directories (${CMAKE_SOURCE_DIR}/include ${PETSC_INCLUDES})
+add_definitions (${PETSC_DEFINITIONS})
 
 # Run through each source
-add_executable(unit_tests ${TEST_SOURCES})
+add_executable(unit_tests ${TEST_SOURCES} ${HEADERS})
 target_link_libraries(unit_tests ${Boost_LIBRARIES} ${PETSC_LIBRARIES} ${MPI_C_LIBRARIES})
 # Loop all the test suites and run each individually
 foreach(testSrc ${TEST_SOURCES})
@@ -35,11 +40,6 @@ foreach(testSrc ${TEST_SOURCES})
         add_test(NAME ${testName} COMMAND ./unit_tests -run_test=${testName})
     ENDIF (NOT ${testSrc} MATCHES "main_test.cc") 
 endforeach(testSrc)
-
-
-# Essential: include our directories first otherwise we can get internal headers from some installed path
-include_directories (${CMAKE_SOURCE_DIR}/include ${PETSC_INCLUDES})
-add_definitions (${PETSC_DEFINITIONS})
 
 # Build and link
 add_executable(njord ${SOURCES} ${HEADERS})

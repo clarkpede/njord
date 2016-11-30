@@ -203,7 +203,7 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
     TSStep(ts_conv);
 
     // Solves the laplacian and stores the result in user->p
-    SolveLaplacian(da_vel, da_p, dt, user);
+    SolveLaplacian(da_vel, da_p, dt, user, NULL);
     CorrectVelocities(da_vel, da_p, dt, user);
 
     time += dt;
