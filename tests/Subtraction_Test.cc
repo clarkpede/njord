@@ -5,13 +5,7 @@
 
 BOOST_AUTO_TEST_SUITE(Subtraction)
 
-
-BOOST_AUTO_TEST_CASE( a_minus_b )
-{
-  PetscMPIInt    rank, size;
-  MPI_Comm_size(PETSC_COMM_WORLD, &size);
-  std::cout << "Size: " << size << std::endl;
-
+BOOST_AUTO_TEST_CASE( a_minus_b ) {
   int a = 2;
   int b = 3;
 

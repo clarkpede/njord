@@ -12,12 +12,14 @@
 
 extern PetscErrorCode ComputeMatrix(KSP ksp, Mat J, Mat jac, void* ctx);
 extern PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt,
-                                        Vec RHS, AppCtx *user);
+                                        Vec RHS, AppCtx *user,
+                                        PetscReal (*opt_func)(PetscReal, PetscReal));
 
 #undef __FUNCT__
 #define __FUNCT__ "SolveLaplacian"
 PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal dt,
-                              AppCtx *user) {
+                              AppCtx *user,
+                              PetscReal (*opt_func)(PetscReal, PetscReal)) {
   KSP ksp;
   Vec RHS;
 
@@ -25,10 +27,10 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal dt,
 
   // Set up the linear algebra system
   VecDuplicate(user->p, &RHS);
-  SetUpLaplacianRHS(da_vel, da_p, dt, RHS, user);
+  SetUpLaplacianRHS(da_vel, da_p, dt, RHS, user, opt_func);
   KSPSetComputeOperators(ksp, ComputeMatrix, user);
 
-  // Set up the reamining KSP settings
+  // Set up the remaining KSP settings
   KSPSetDM(ksp, da_p);
   KSPSetFromOptions(ksp);
   KSPSetUp(ksp);
@@ -44,12 +46,14 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal dt,
 #undef __FUNCT__
 #define __FUNCT__ "SetUpLaplacianRHS"
 PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
-                                 AppCtx *user){
+                                 AppCtx *user,
+                                 PetscReal (*opt_func)(PetscReal, PetscReal)){
   Vec local_vel, local_p;
   Field **field;
   PetscScalar **rhs;
   PetscReal hx, hy;
   PetscReal dudx, dvdy;
+  PetscReal x,y;
   PetscInt xs,ys,xm,ym,i,j;
 
   hx = user->grid->dx;
@@ -69,9 +73,17 @@ PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
 
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
-      dudx = (field[j][i].u - field[j][i-1].u)/hx;
-      dvdy = (field[j][i].v - field[j-1][i].v)/hy;
-      rhs[j][i] = (dudx + dvdy)/dt;
+      if (opt_func == NULL) {
+        dudx = (field[j][i].u - field[j][i-1].u)/hx;
+        dvdy = (field[j][i].v - field[j-1][i].v)/hy;
+        rhs[j][i] = (dudx + dvdy)/dt;
+      } else {
+        // NOTE: These x,y definitions are for testing only.
+        // They do not match the rest of the staggered grid x,y definitions.
+        x = i*hx;
+        y = j*hy;
+        rhs[j][i] = opt_func(x, y);
+      };
     }
   }
 
