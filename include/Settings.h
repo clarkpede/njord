@@ -24,6 +24,7 @@ typedef struct {
   DMBoundaryType bc_x, bc_y; // Boundary type for distributed array (not FD)
   PetscInt mx, my;           // Grid resolution
   PetscReal Lx, Ly;          // Domain size
+  PetscReal dx, dy;          // Grid spacing
   PetscInt stencil_width;
   PetscInt dof;              // For this problem 4: u, v, p, & vt
 } GridInfo;
@@ -32,7 +33,7 @@ typedef struct {
 typedef struct {
   Parameters  *param;    // Runtime parameters
   GridInfo    *grid;     // Grid information
-  Vec         vel, p, vt; // Vectors representing the solution at each time step
+  Vec         vel, p; // Vectors representing the solution at each time step
 } AppCtx;
 
 #endif /* INCLUDE_SETTINGS_H_ */

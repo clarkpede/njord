@@ -8,13 +8,15 @@
 #include <petscksp.h>
 
 #include "Laplacian.h"
+#include "Field.h"
 
 extern PetscErrorCode ComputeMatrix(KSP ksp, Mat J, Mat jac, void* ctx);
-extern PetscErrorCode ComputeRHS(KSP ksp, Vec b, void *ctx);
+extern PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt,
+                                        Vec RHS, AppCtx *user);
 
 #undef __FUNCT__
 #define __FUNCT__ "SolveLaplacian"
-PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
+PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal dt,
                               AppCtx *user) {
   KSP ksp;
   Vec RHS;
@@ -22,7 +24,8 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
   KSPCreate(PETSC_COMM_WORLD, &ksp);
 
   // Set up the linear algebra system
-  KSPSetComputeRHS(ksp,ComputeRHS,user);
+  VecDuplicate(user->p, &RHS);
+  SetUpLaplacianRHS(da_vel, da_p, dt, RHS, user);
   KSPSetComputeOperators(ksp, ComputeMatrix, user);
 
   // Set up the reamining KSP settings
@@ -31,51 +34,62 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal timestep,
   KSPSetUp(ksp);
 
   // Solve the system
-  KSPSolve(ksp,NULL,NULL);
-  KSPGetSolution(ksp,&(user->p));
+  KSPSolve(ksp,RHS,user->p);
+
+  VecDestroy(&RHS);
 
   return 0;
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "ComputeRHS"
-PetscErrorCode ComputeRHS(KSP ksp, Vec b, void *ctx)
-{
-  AppCtx    *user = (AppCtx*)ctx;
-  PetscErrorCode ierr;
-  PetscInt       i,j,mx,my,xm,ym,xs,ys;
-  PetscScalar    Hx,Hy;
-  PetscScalar    **rhs;
-  DM             da;
+#define __FUNCT__ "SetUpLaplacianRHS"
+PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
+                                 AppCtx *user){
+  Vec local_vel, local_p;
+  Field **field;
+  PetscScalar **rhs;
+  PetscReal hx, hy;
+  PetscReal dudx, dvdy;
+  PetscInt xs,ys,xm,ym,i,j;
 
-  PetscFunctionBeginUser;
-  KSPGetDM(ksp,&da);
-  DMDAGetInfo(da, 0, &mx, &my, 0,0,0,0,0,0,0,0,0,0);
-  Hx   = user->grid->Lx / (PetscReal)(mx);
-  Hy   = user->grid->Ly / (PetscReal)(my);
+  hx = user->grid->dx;
+  hy = user->grid->dy;
 
-  DMDAGetCorners(da,&xs,&ys,0,&xm,&ym,0);
-  DMDAVecGetArray(da, b, &rhs);
+  // Get the local velocity vector and array, with ghost points
+  DMGetLocalVector(da_vel, &local_vel);
+  DMGlobalToLocalBegin(da_vel, user->vel, INSERT_VALUES, local_vel);
+  DMGlobalToLocalEnd  (da_vel, user->vel, INSERT_VALUES, local_vel);
+  // The trailing "Read" on this function just mean *not* collective for MPI:
+  DMDAVecGetArrayRead (da_vel, local_vel, &field);
+
+  // Set up the RHS with a local array, without ghost points
+  DMDAVecGetArray(da_p, RHS, &rhs);
+
+  DMDAGetCorners(da_p,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
+
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
-      rhs[j][i] = 0.0; // FIXME: How to handle u->p communication?
+      dudx = (field[j][i].u - field[j][i-1].u)/hx;
+      dvdy = (field[j][i].v - field[j-1][i].v)/hy;
+      rhs[j][i] = (dudx + dvdy)/dt;
     }
   }
-  DMDAVecRestoreArray(da, b, &rhs);
-  VecAssemblyBegin(b);
-  VecAssemblyEnd(b);
 
-  /* force right hand side to be consistent for singular matrix */
-  /* note this is really a hack, normally the model would provide you with a
-   * consistent right-hand side */
+  // Put the array values back into the vectors
+  DMDAVecRestoreArray    (da_p,   RHS,       &rhs);
+  DMDAVecRestoreArrayRead(da_vel, local_vel, &field);
+
+  // Force the right hand side to be consistent for a singular matrix
+  // Note that this is really a hack; normally the model would provide you with
+  // a consistent RHS
   MatNullSpace nullspace;
-
-  MatNullSpaceCreate(PETSC_COMM_WORLD,PETSC_TRUE,0,0,&nullspace);
-  MatNullSpaceRemove(nullspace,b);
+  MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, 0, &nullspace);
+  MatNullSpaceRemove(nullspace,RHS);
   MatNullSpaceDestroy(&nullspace);
 
-  PetscFunctionReturn(0);
+  return 0;
 }
+
 
 #undef __FUNCT__
 #define __FUNCT__ "ComputeMatrix"
