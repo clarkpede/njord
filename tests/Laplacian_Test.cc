@@ -17,12 +17,12 @@ struct F{
     // Setup
     //--------------------------
     // Build the grid
-    grid.mx = 32;
-    grid.my = 32;
+    grid.mx = 64;
+    grid.my = 64;
     grid.Lx = 2*M_PI;
     grid.Ly = 2*M_PI;
-    grid.dx = grid.Lx/grid.mx;
-    grid.dy = grid.Ly/grid.my;
+    grid.dx = grid.Lx/(grid.mx);
+    grid.dy = grid.Ly/(grid.my);
     grid.dof = 2;
     grid.bc_x = DM_BOUNDARY_PERIODIC;
     grid.bc_y = DM_BOUNDARY_PERIODIC;
@@ -69,7 +69,8 @@ struct F{
 };
 
 PetscReal test_rhs_func(PetscReal x, PetscReal y) {
-  return std::cos(x) + std::sin(y);
+  // Test function has to satisfy Neumann BCs
+  return std::cos(x) + std::cos(y);
 };
 
 PetscErrorCode SetUpExactSolution(DM da, Vec U, AppCtx *user) {
@@ -77,19 +78,17 @@ PetscErrorCode SetUpExactSolution(DM da, Vec U, AppCtx *user) {
   PetscScalar **p;
   PetscReal hx, hy, x, y;
 
-  // This is not the usual (Mx-1) because the staggered grid omits one of the
-  // nodal points to maintain consistent u,v,p array sizes.
-  hx = user->grid->Lx/user->grid->mx;
-  hy = user->grid->Ly/user->grid->my;
+  hx = user->grid->dx;
+  hy = user->grid->dy;
 
   DMDAGetCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
   DMDAVecGetArray(da,U,&p);
 
   for (j=ys; j<ys+ym; j++) {
-    y = j*hy;
+    y = (j+.5)*hy;
     for (i=xs; i<xs+xm; i++) {
-      x = i*hx;
-      p[j][i]  = test_rhs_func(x,y);
+      x = (i+.5)*hx;
+      p[j][i]  = -test_rhs_func(x,y);
     }
   }
 
@@ -123,9 +122,11 @@ BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Trig_Is_Close ) {
 
   PetscScalar tol = 1e-3;
   PetscScalar norm;
+  PetscInt size;
   VecAXPY(user->p,-1.0,exact);
   VecNorm(user->p, NORM_2, &norm);
-  BOOST_CHECK_SMALL(norm, tol);
+  VecGetSize(user->p, &size);
+  BOOST_CHECK_SMALL(norm/size, tol);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
