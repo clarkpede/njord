@@ -18,20 +18,22 @@ find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 include_directories($(Boost_INCLUDE_DIRS), ${MPI_INCLUDE_PATH})
 
 # Source files
+set(MAIN "${CMAKE_SOURCE_DIR}/src/main.cc")
 FILE(GLOB SOURCES ${CMAKE_SOURCE_DIR}/src/*.c ${CMAKE_SOURCE_DIR}/src/*.cc)
 FILE(GLOB HEADERS ${CMAKE_SOURCE_DIR}/include/*.h)
+# Separate main from the source files listing
+list(REMOVE_ITEM SOURCES ${CMAKE_SOURCE_DIR}/src/main.cc)
 
 # Test files
 enable_testing()
-FILE(GLOB TEST_SOURCES ${CMAKE_SOURCE_DIR}/src/*.c ${CMAKE_SOURCE_DIR}/src/*.cc ${CMAKE_SOURCE_DIR}/tests/*.cc)
-list(REMOVE_ITEM TEST_SOURCES ${CMAKE_SOURCE_DIR}/src/main.cc)
+FILE(GLOB TEST_SOURCES ${CMAKE_SOURCE_DIR}/tests/*.cc)
 
 # Essential: include our directories first otherwise we can get internal headers from some installed path
 include_directories (${CMAKE_SOURCE_DIR}/include ${PETSC_INCLUDES})
 add_definitions (${PETSC_DEFINITIONS})
 
 # Run through each source
-add_executable(unit_tests ${TEST_SOURCES} ${HEADERS})
+add_executable(unit_tests ${TEST_SOURCES} ${SOURCES} ${HEADERS})
 target_link_libraries(unit_tests ${Boost_LIBRARIES} ${PETSC_LIBRARIES} ${MPI_C_LIBRARIES})
 # Loop all the test suites and run each individually
 foreach(testSrc ${TEST_SOURCES})
@@ -42,7 +44,7 @@ foreach(testSrc ${TEST_SOURCES})
 endforeach(testSrc)
 
 # Build and link
-add_executable(njord ${SOURCES} ${HEADERS})
+add_executable(njord ${MAIN} ${SOURCES} ${HEADERS})
 target_link_libraries(njord ${PETSC_LIBRARIES})
 
 
