@@ -57,11 +57,19 @@ int main(int argc, char* argv[]) {
   SetInitialVelocities(da_vel, user->vel, user);
   SetInitialPressure(da_p, user->p, user);
 
+  // Output the initial file to a *.vts file
+  if(param.write_output) {
+    PetscViewer viewer;
+    PetscViewerVTKOpen(PETSC_COMM_WORLD,"output/initialfield.vts",
+                       FILE_MODE_WRITE,&viewer);
+    VecView(user->vel,viewer);
+    PetscViewerDestroy(&viewer);
+  }
+
   // Advance the solution through time
   TimeMarch(da_vel, da_p, user);
 
   // Output to a *.vts file.
-  // TODO: Plot cell-centered values...
   if(param.write_output) {
     PetscViewer viewer;
     PetscViewerVTKOpen(PETSC_COMM_WORLD,param.outfile,FILE_MODE_WRITE,&viewer);
@@ -97,7 +105,7 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
   // Parameters
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified runtime options",
                     __FILE__);{
-    param->nu = 1.0;
+    param->nu = 1.0/5000;
     param->end_time = 1.0;
     PetscOptionsReal("-T","Duration of the simulation","none",param->end_time,
                      &(param->end_time),NULL);
@@ -128,7 +136,7 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
     // to the staggered grid arrangement.
     grid->dx = grid->Lx/grid->mx;
     grid->dy = grid->Ly/grid->my;
-    grid->stencil = DMDA_STENCIL_BOX;
+    grid->stencil = DMDA_STENCIL_STAR;
     grid->bc_x = DM_BOUNDARY_PERIODIC;
     grid->bc_y = DM_BOUNDARY_PERIODIC;
     grid->dof = 2;

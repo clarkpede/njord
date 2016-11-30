@@ -143,13 +143,17 @@ PetscErrorCode get_dt(DM da, Vec U, PetscReal* dt, AppCtx* user){
   PetscReal max_vel;
   PetscInt  mx, my;
   PetscReal hx, hy;
+  PetscReal dt_conv, dt_diff;
 
   hx = user->grid->dx;
 
-//  VecMax(U,NULL,&max_vel);
-//  *dt = CFL*hx/(max_vel);
+  VecMax(U,NULL,&max_vel);
+  dt_conv = user->param->CFL*hx/(max_vel);
 
-  *dt = user->param->CFL*(hx*hx)/user->param->nu;
+  dt_diff = user->param->CFL*(hx*hx)/user->param->nu;
+
+  // Return the smaller of the two
+  *dt = ((dt_conv < dt_diff) ? dt_conv: dt_diff);
 
   return 0;
 }
@@ -205,6 +209,25 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
     // Solves the Poisson equation and stores the result in user->p
     SolvePoisson(da_vel, da_p, dt, user, NULL);
     CorrectVelocities(da_vel, da_p, dt, user);
+
+    // Output to a *.vts file.
+    if(user->param->write_output) {
+      char filename[128];
+      char* name = "output/solution";
+      char num[5];
+      char* ext  = ".vts";
+
+      // Build the filename
+      sprintf(num, "%1d", n);
+      strncpy(filename, name, sizeof(filename));
+      strncat(filename, num, (sizeof(filename) - strlen(filename)));
+      strncat(filename, ext, (sizeof(filename) - strlen(filename)));
+
+      PetscViewer viewer;
+      PetscViewerVTKOpen(PETSC_COMM_WORLD,filename,FILE_MODE_WRITE,&viewer);
+      VecView(user->vel,viewer);
+      PetscViewerDestroy(&viewer);
+    }
 
     time += dt;
     n++;
