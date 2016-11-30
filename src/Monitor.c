@@ -27,8 +27,7 @@
             information about the problem size, workspace and the exact
             solution.
 */
-PetscErrorCode Monitor(TS ts,PetscInt step,PetscReal time,Vec u,void *ctx)
-{
+PetscErrorCode Monitor(TS ts,PetscInt step,PetscReal time,Vec u, void *ctx) {
   AppCtx         *appctx = (AppCtx*)ctx;   /* user-defined application context */
   PetscReal      dt;
   PetscReal      maxim, mean;
@@ -40,6 +39,14 @@ PetscErrorCode Monitor(TS ts,PetscInt step,PetscReal time,Vec u,void *ctx)
   VecSum(u, &mean);
   mean /= size;
   TSGetTimeStep(ts,&dt);
+
+  // Abort if the solution is diverging
+  if (maxim > 1e4 || maxim < -1e4) {
+    PetscAbortErrorHandler(PETSC_COMM_WORLD, __LINE__ ,  __FUNCT__ , __FILE__ ,
+                           PETSC_ERR_NOT_CONVERGED, 404,
+                           "Solution is diverging over time.", NULL);
+  }
+
   PetscPrintf(PETSC_COMM_WORLD,"step #: %D,\t step size = %g,\t time = %g,\t max = %g,\t mean = %g\n",step,(double)dt,(double)time, maxim, mean);
 
   return 0;
