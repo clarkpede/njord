@@ -10,12 +10,13 @@
 
 #include <petscdmda.h>
 #include <petscts.h>
+
 #include "math.h"
 
+#include "Poisson.h"
 #include "Corrector.h"
 #include "Field.h"
 #include "Monitor.h"
-#include "Laplacian.h"
 #include "Settings.h"
 
 #ifdef __cplusplus

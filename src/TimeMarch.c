@@ -202,8 +202,8 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
     Monitor(ts_conv,n,time,user->vel,NULL); // Manually print out monitor data
     TSStep(ts_conv);
 
-    // Solves the laplacian and stores the result in user->p
-    SolveLaplacian(da_vel, da_p, dt, user, NULL);
+    // Solves the Poisson equation and stores the result in user->p
+    SolvePoisson(da_vel, da_p, dt, user, NULL);
     CorrectVelocities(da_vel, da_p, dt, user);
 
     time += dt;

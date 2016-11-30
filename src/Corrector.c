@@ -37,7 +37,7 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
       // Add in the velocity correction.
       dpdx = (p[j][i+1]-p[j][i])/hx;
       dpdy = (p[j+1][i]-p[j][i])/hy;
-      PetscPrintf(PETSC_COMM_WORLD,"dpdx:\t%g\t\tdpdy:\t%g\n", dpdx, dpdy);
+//      PetscPrintf(PETSC_COMM_WORLD,"dpdx:\t%g\t\tdpdy:\t%g\n", dpdx, dpdy);
       vel[j][i].u -= dt*dpdx;
       vel[j][i].v -= dt*dpdy;
     }

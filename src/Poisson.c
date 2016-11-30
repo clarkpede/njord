@@ -1,5 +1,5 @@
 /*
- * Laplacian.cc
+ * Poisson.c
  *
  *  Created on: Nov 26, 2016
  *      Author: clarkp
@@ -7,18 +7,18 @@
 
 #include <petscksp.h>
 
-#include "Laplacian.h"
+#include "Poisson.h"
 #include "Field.h"
 
 extern PetscErrorCode ComputeMatrix(KSP ksp, Mat J, Mat jac, void* ctx);
 extern PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix, AppCtx *user);
-extern PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt,
+extern PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt,
                                         Vec RHS, AppCtx *user,
                                         PetscReal (*opt_func)(PetscReal, PetscReal));
 
 #undef __FUNCT__
-#define __FUNCT__ "SolveLaplacian"
-PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal dt,
+#define __FUNCT__ "SolvePoisson"
+PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
                               AppCtx *user,
                               PetscReal (*opt_func)(PetscReal, PetscReal)) {
   KSP ksp;
@@ -34,7 +34,7 @@ PetscErrorCode SolveLaplacian(DM da_vel, DM da_p, PetscReal dt,
 
   // Create the RHS with the calculated divergence of u
   VecDuplicate(user->p, &RHS);
-  SetUpLaplacianRHS(da_vel, da_p, dt, RHS, user, opt_func);
+  SetUpPoissonRHS(da_vel, da_p, dt, RHS, user, opt_func);
 
   // Set up the remaining KSP settings
   KSPSetDM(ksp, da_p); // Sets the DM used by preconditioners
@@ -124,8 +124,8 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix, AppCtx *user) {
 }
 
 #undef __FUNCT__
-#define __FUNCT__ "SetUpLaplacianRHS"
-PetscErrorCode SetUpLaplacianRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
+#define __FUNCT__ "SetUpPoissonRHS"
+PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
                                  AppCtx *user,
                                  PetscReal (*opt_func)(PetscReal, PetscReal)){
   Vec local_vel, local_p;
