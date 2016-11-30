@@ -10,13 +10,19 @@
 
 #include <petscdmda.h>
 #include <petscts.h>
+#include "math.h"
+
+#include "Corrector.h"
+#include "Field.h"
+#include "Monitor.h"
+#include "Laplacian.h"
 #include "Settings.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-PetscErrorCode TimeMarch(DM da_vel, DM da_p, DM da_vt, AppCtx *user);
+PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user);
 
 #ifdef __cplusplus
 }

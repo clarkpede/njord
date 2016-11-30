@@ -20,7 +20,7 @@ PetscErrorCode ReportParams(Parameters*, GridInfo*);
 int main(int argc, char* argv[]) {
   Vec   x,r;      // Solution and residual vectors
   Mat   J;        // Jacobian matrix
-  DM    da_vel, da_p, da_vt;
+  DM    da_vel, da_p;
   AppCtx *user;      // User defined work context
   Parameters param;  // Physical and other parameters
   GridInfo grid;     // Parameters defining the grid
@@ -49,26 +49,16 @@ int main(int argc, char* argv[]) {
   DMCreateGlobalVector(da_vel,&(user->vel));
 
   // Create a distributed array for the pressure
-  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
-               PETSC_DECIDE, PETSC_DECIDE, 1, grid.stencil_width,
-               0,0,&da_p);
+  DMDAGetReducedDMDA(da_vel, 1, &da_p);
   DMSetApplicationContext(da_p,user);
   DMCreateGlobalVector(da_p,&(user->p));
-
-  // Create a distributed array for the pressure
-  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
-               PETSC_DECIDE, PETSC_DECIDE, 1, grid.stencil_width,
-               0,0,&da_vt);
-  DMSetApplicationContext(da_vt,user);
-  DMCreateGlobalVector(da_vt,&(user->vt));
 
   // Create the initial field
   SetInitialVelocities(da_vel, user->vel, user);
   SetInitialPressure(da_p, user->p, user);
-  SetInitialVt(da_vt, user->vt, user);
 
   // Advance the solution through time
-  TimeMarch(da_vel, da_p, da_vt, user);
+  TimeMarch(da_vel, da_p, user);
 
   // Output to a *.vts file.
   // TODO: Plot cell-centered values...
@@ -81,11 +71,9 @@ int main(int argc, char* argv[]) {
 
   // Cleanup
   VecDestroy(&user->vel);
-  VecDestroy(&user->vt);
   VecDestroy(&user->p);
   PetscFree(user);
   DMDestroy(&da_vel);
-  DMDestroy(&da_vt);
   DMDestroy(&da_p);
   PetscPrintf(PETSC_COMM_WORLD,"Exited successfully.\n");
   PetscFinalize();
@@ -136,6 +124,10 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
                            grid->mx,&grid->mx,NULL);
     ierr = PetscOptionsInt("-my","Grid resolution in y-direction","none",
                            grid->my,&grid->my,NULL);
+    // This is not the usual Lx/(mx-1) because we omit one set of points due
+    // to the staggered grid arrangement.
+    grid->dx = grid->Lx/grid->mx;
+    grid->dy = grid->Ly/grid->my;
     grid->stencil = DMDA_STENCIL_BOX;
     grid->bc_x = DM_BOUNDARY_PERIODIC;
     grid->bc_y = DM_BOUNDARY_PERIODIC;

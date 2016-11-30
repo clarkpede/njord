@@ -4,12 +4,8 @@
  *  Created on: Nov 23, 2016
  *      Author: clarkp
  */
-#include "math.h"
 
 #include "TimeMarch.h"
-#include "Field.h"
-#include "Monitor.h"
-#include "Laplacian.h"
 
 /**
  *
@@ -143,20 +139,17 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
  */
 #undef __FUNCT__
 #define __FUNCT__ "get_dt"
-PetscErrorCode get_dt(DM da, Vec U, PetscReal CFL,
-                      PetscReal Lx, PetscReal Ly, PetscReal* dt){
+PetscErrorCode get_dt(DM da, Vec U, PetscReal* dt, AppCtx* user){
   PetscReal max_vel;
   PetscInt  mx, my;
   PetscReal hx, hy;
 
-  DMDAGetInfo(da, PETSC_IGNORE, &mx, &my, PETSC_IGNORE, PETSC_IGNORE,
-              PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE,
-              PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE);
-  hx = Lx/(PetscReal)(mx);
-  hy = Ly/(PetscReal)(my);
+  hx = user->grid->dx;
 
-  VecMax(U,NULL,&max_vel);
-  *dt = CFL*hx/(max_vel);
+//  VecMax(U,NULL,&max_vel);
+//  *dt = CFL*hx/(max_vel);
+
+  *dt = user->param->CFL*(hx*hx)/user->param->nu;
 
   return 0;
 }
@@ -167,13 +160,12 @@ PetscErrorCode get_dt(DM da, Vec U, PetscReal CFL,
  */
 #undef __FUNCT__
 #define __FUNCT__ "TimeMarch"
-PetscErrorCode TimeMarch(DM da_vel, DM da_p, DM da_vt, AppCtx *user) {
+PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   TS    ts_conv, ts_diff;
   SNES  snes;
   PetscReal dt, time;
   PetscInt kMaxSteps = 1000;
   PetscInt n;
-
 
   //---------------------------------------------------------------------------
   // Set up timestepper
@@ -182,15 +174,14 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, DM da_vt, AppCtx *user) {
   TSSetDM(ts_conv, da_vel);
   TSSetProblemType(ts_conv,TS_NONLINEAR);
   TSSetRHSFunction(ts_conv,NULL,FormFunction,user);
-  TSSetType(ts_conv, TSEULER);
+  TSSetType(ts_conv, TSRK);
   TSGetSNES(ts_conv,&snes);
   TSSetSolution(ts_conv, user->vel);
   if (user->param->verbose) TSMonitorSet(ts_conv,Monitor,NULL,NULL);
 
   // Set the initial time step
   time = 0.0;
-  get_dt(da_vel, user->vel, user->param->CFL,
-         user->grid->Lx, user->grid->Ly, &dt);
+  get_dt(da_vel, user->vel, &dt, user);
   TSSetInitialTimeStep(ts_conv,time,dt);
   TSSetDuration(ts_conv,kMaxSteps,user->param->end_time);
   TSSetExactFinalTime(ts_conv, TS_EXACTFINALTIME_MATCHSTEP);
@@ -203,19 +194,17 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, DM da_vt, AppCtx *user) {
   while (time < user->param->end_time) {
     if (time > 0.0) {
       // Recompute the time step based on the CFL condition
-      get_dt(da_vel, user->vel, user->param->CFL,
-             user->grid->Lx, user->grid->Ly, &dt);
+      get_dt(da_vel, user->vel, &dt, user);
       TSSetTimeStep(ts_conv, dt);
     }
-    TSGetTimeStep(ts_conv,&dt); // Just in case dt is not set exactly
+    TSGetTimeStep(ts_conv,&dt); // In case dt is not set exactly, read it
 
-    Monitor(ts_conv,n,time,user->vel,NULL);
+    Monitor(ts_conv,n,time,user->vel,NULL); // Manually print out monitor data
     TSStep(ts_conv);
 
-    // Solve for the pressure-like term
+    // Solves the laplacian and stores the result in user->p
     SolveLaplacian(da_vel, da_p, dt, user);
-
-    // Correct the fields
+    CorrectVelocities(da_vel, da_p, dt, user);
 
     time += dt;
     n++;
