@@ -42,9 +42,15 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   VecDuplicate(user->p, &RHS);
   SetUpPoissonRHS(da_vel, da_p, dt, RHS, nullspace, user, opt_func);
 
-  // Set up the remaining KSP settings
   KSPSetDM(ksp, da_p); // Sets the DM used by preconditioners
   KSPSetDMActive(ksp, PETSC_FALSE); // Tells KSP to keep our matrix
+
+  // Set up the incomplete Cholesky factorization preconditioner
+  PC pc;
+  KSPGetPC(ksp, &pc);
+  PCSetType(pc, PCICC);
+
+  // Finish setting up ksp
   KSPSetFromOptions(ksp);
   KSPSetUp(ksp);
 
