@@ -246,6 +246,9 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   PetscReal dt, time;
   PetscInt kMaxSteps = 1000;
   PetscInt n;
+  Mat J=0;
+
+
 
   //---------------------------------------------------------------------------
   // Set up timestepper
@@ -254,10 +257,19 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   TSSetDM(ts_conv, da_vel);
   TSSetProblemType(ts_conv,TS_NONLINEAR);
   TSSetRHSFunction(ts_conv,NULL,FormFunction,user);
-  TSSetType(ts_conv, TSRK);
+  TSSetType(ts_conv, TSCN);
   TSGetSNES(ts_conv,&snes);
   TSSetSolution(ts_conv, user->vel);
   if (user->param->verbose) TSMonitorSet(ts_conv,Monitor,NULL,NULL);
+
+  // Set up the Jacobian for implicit methods
+  MatCreate(PETSC_COMM_WORLD,&J);
+  MatSetSizes(J,PETSC_DECIDE,PETSC_DECIDE, user->grid->mx, user->grid->my);
+  MatSetFromOptions(J);
+  MatSeqAIJSetPreallocation(J,5,NULL);
+  MatMPIAIJSetPreallocation(J,5,NULL,5,NULL);
+  SNESSetJacobian(snes,J,J,SNESComputeJacobianDefault,NULL);
+
 
   // Set the initial time step
   time = 0.0;
