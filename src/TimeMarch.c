@@ -3,9 +3,128 @@
  *
  *  Created on: Nov 23, 2016
  *      Author: clarkp
+ *
+ *-----------------------------------------------------------------------------
+ * CONTROL VOLUMES
+ *-----------------------------------------------------------------------------
+ * U Control Volume
+ *
+ * v_ij          v_i+1,j
+ *|^|--------------|^|
+ * |                |
+ * |                |
+ * p_ij   u_ij     p_i+1,j
+ * |                |
+ * |                |
+ *|^|--------------|^|
+ * v_i,j-1       v_i+1,j-1
+ *
+ *-----------------------------------------------------------------------------
+ *
+ * V control volume
+ *
+ * u_i-1,j+1        u_i,j+1
+ * =>-----p_i,j+1--=>
+ * |                |
+ * |                |
+ * |      v_ij      |
+ * |                |
+ * |                |
+ * =>-----p_ij-----=>
+ * u_i-1,j         u_ij
+ *
+ *-----------------------------------------------------------------------------
  */
 
 #include "TimeMarch.h"
+
+enum BoundaryType {
+  NONE,
+  TOP,
+  BOTTOM,
+  LEFT,
+  RIGHT,
+  TOPLEFT,
+  TOPRIGHT,
+  BOTTOMLEFT,
+  BOTTOMRIGHT
+};
+
+
+PetscScalar get_FCu(Field **x, PetscReal hx, PetscReal hy,
+                    PetscInt i, PetscInt j) {
+  PetscReal      mN, mS, mE, mW;
+  PetscReal      uN, uS, uE, uW;
+
+  // Mass flow rates for u control volume
+  mN =  0.5*hx*(x[j][i].v   + x[j][i+1].v);
+  mS = -0.5*hx*(x[j-1][i].v + x[j-1][i+1].v);
+  mE =  0.5*hy*(x[j][i].u   + x[j][i+1].u);
+  mW = -0.5*hy*(x[j][i].u   + x[j][i-1].u);
+
+  // Interpolated u velocities
+  uN = 0.5*(x[j][i].u + x[j+1][i].u);
+  uS = 0.5*(x[j][i].u + x[j-1][i].u);
+  uE = 0.5*(x[j][i].u + x[j][i+1].u);
+  uW = 0.5*(x[j][i].u + x[j][i-1].u);
+
+  // U momentum convection, divided by area
+  return  (mN*uN + mS*uS + mE*uE + mW*uW)/(hx*hy);
+}
+
+
+PetscScalar get_FCv(Field **x, PetscReal hx, PetscReal hy,
+                    PetscInt i, PetscInt j) {
+  PetscReal      mN, mS, mE, mW;
+  PetscReal      vN, vS, vE, vW;
+
+  // Mass flow rates for v control volume
+  mN =  0.5*hx*(x[j][i].v   + x[j+1][i].v);
+  mS = -0.5*hx*(x[j][i].v   + x[j-1][i].v);
+  mE =  0.5*hy*(x[j][i].u   + x[j+1][i].u);
+  mW = -0.5*hy*(x[j][i-1].u + x[j+1][i-1].u);
+
+  // Interpolated v velocities
+  vN = 0.5*(x[j][i].v + x[j+1][i].v);
+  vS = 0.5*(x[j][i].v + x[j-1][i].v);
+  vE = 0.5*(x[j][i].v + x[j][i+1].v);
+  vW = 0.5*(x[j][i].v + x[j][i-1].v);
+
+  // V momentum convection, divided by area
+  return (mN*vN + mS*vS + mE*vE + mW*vW)/(hx*hy);
+}
+
+PetscReal get_FDu(Field **x, PetscReal hx, PetscReal hy,
+                  PetscInt i, PetscInt j, PetscReal nu) {
+  PetscReal FDu;
+  PetscReal dUdyN, dUdyS, dUdxE, dUdxW;
+
+  // U diffusion from momentum equation:
+  dUdyN = (x[j+1][i].u - x[j][i].u)/hy;
+  dUdyS = (x[j][i].u   - x[j-1][i].u)/hy;
+  dUdxE = (x[j][i+1].u - x[j][i].u)/hx;
+  dUdxW = (x[j][i].u   - x[j][i-1].u)/hx;
+
+  FDu = nu * (dUdyN*hx - dUdyS*hx + dUdxE*hy - dUdxW*hy);
+  FDu /= (hx*hy);
+  return FDu;
+}
+
+PetscReal get_FDv(Field **x, PetscReal hx, PetscReal hy,
+                  PetscInt i, PetscInt j, PetscReal nu) {
+  PetscReal FDv;
+  PetscReal dVdyN, dVdyS, dVdxE, dVdxW;
+
+  // V momentum equation:
+  dVdyN = (x[j+1][i].v - x[j][i].v)/hy;
+  dVdyS = (x[j][i].v   - x[j-1][i].v)/hy;
+  dVdxE = (x[j][i+1].v - x[j][i].v)/hx;
+  dVdxW = (x[j][i].v   - x[j][i-1].v)/hx;
+
+  FDv = nu * (dVdyN*hx - dVdyS*hx + dVdxE*hy + dVdxW*hy);
+  FDv /= (hx*hy);
+  return FDv;
+}
 
 /**
  *
@@ -63,59 +182,16 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
   // Compute function over the locally owned part of the grid
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
-      //-----------------------------------------------------------------------
-      // U advection:
-      //-----------------------------------------------------------------------
-      // Mass flow rates for u control volume
-      mN =  0.5*hx*(x[j][i].v   + x[j][i+1].v);
-      mS = -0.5*hx*(x[j-1][i].v + x[j-1][i+1].v);
-      mE =  0.5*hy*(x[j][i].u   + x[j][i+1].u);
-      mW = -0.5*hy*(x[j][i].u   + x[j][i-1].u);
-      // Interpolated u velocities
-      uN = 0.5*(x[j][i].u + x[j+1][i].u);
-      uS = 0.5*(x[j][i].u + x[j-1][i].u);
-      uE = 0.5*(x[j][i].u + x[j][i+1].u);
-      uW = 0.5*(x[j][i].u + x[j][i-1].u);
-      // U momentum convection, divided by area
-      FCu =  (mN*uN + mS*uS + mE*uE + mW*uW)/(hx*hy);
+      // Convection fluxes, divided by the area:
+      FCu =  get_FCu(x,hx,hy,i,j);
+      FCu =  get_FCv(x,hx,hy,i,j);
 
-      //-----------------------------------------------------------------------
-      // V advection:
-      //-----------------------------------------------------------------------
-      // Mass flow rates for v control volume
-      mN =  0.5*hx*(x[j][i].v   + x[j+1][i].v);
-      mS = -0.5*hx*(x[j-1][i].v + x[j][i].v);
-      mE =  0.5*hy*(x[j][i].u   + x[j+1][i].u);
-      mW = -0.5*hy*(x[j][i-1].u + x[j+1][i-1].u);
-      // Interpolated v velocities
-      vN = 0.5*(x[j][i].v + x[j+1][i].v);
-      vS = 0.5*(x[j][i].v + x[j-1][i].v);
-      vE = 0.5*(x[j][i].v + x[j][i+1].v);
-      vW = 0.5*(x[j][i].v + x[j][i-1].v);
-      // V momentum convection, divided by area
-      FCv =  (mN*vN + mS*vS + mE*vE + mW*vW)/(hx*hy);
-
-      //------------------------------------------------------------------------
-      // Diffusion, divided by the area
-      //------------------------------------------------------------------------
-      // U momentum equation:
-      dUdyN = (x[j+1][i].u - x[j][i].u)/hy;
-      dUdyS = (x[j][i].u   - x[j-1][i].u)/hy;
-      dUdxE = (x[j][i+1].u - x[j][i].u)/hx;
-      dUdxW = (x[j][i].u   - x[j][i-1].u)/hx;
-      FDu = user->param->nu * (dUdyN*hx - dUdyS*hx + dUdxE*hy - dUdxW*hy);
-      FDu /= (hx*hy);
-
-      // V momentum equation:
-      dVdyN = (x[j+1][i].v - x[j][i].v)/hy;
-      dVdyS = (x[j][i].v   - x[j-1][i].v)/hy;
-      dVdxE = (x[j][i+1].v - x[j][i].v)/hy;
-      dVdxW = (x[j][i].v   - x[j][i-1].v)/hy;
-      FDv = user->param->nu * (dVdyN*hx - dVdyS*hx + dVdxE*hy + dVdxE*hy);
-      FDv /= (hx*hy);
+      // Diffusion fluxes, divided by the area:
+      FDu = get_FDu(x,hx,hy,i,j, user->param->nu);
+      FDv = get_FDu(x,hx,hy,i,j, user->param->nu);
 
       f[j][i].u = -FCu + FDu;
-      f[j][i].v = -FCu + FDu;
+      f[j][i].v = -FCv + FDv;
     }
   }
 
@@ -192,7 +268,7 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
 
   // Update with user-defined options
   TSSetFromOptions(ts_conv);
-  if (user->param->verbose) TSView(ts_conv,PETSC_VIEWER_STDOUT_SELF);
+  if (user->param->verbose) TSView(ts_conv,PETSC_VIEWER_STDOUT_WORLD);
 
   n = 0;
   while (time < user->param->end_time) {
