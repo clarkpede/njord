@@ -31,18 +31,18 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
 
   // u is located at the east/west sides of each cell
   for (j=ys; j<ys+ym; j++) {
-    y = j*hy + hy/2.0;
+    y = j*hy - hy/2.0;
     for (i=xs; i<xs+xm; i++) {
-      x = (i+1)*hx;
+      x = i*hx;
       u[j][i].u  = -cos(x)*sin(y);
     }
   }
 
   // v is located at the north/south sides of each cell
   for (j=ys; j<ys+ym; j++) {
-    y = (j+1)*hy;
+    y = j*hy;
     for (i=xs; i<xs+xm; i++) {
-      x = i*hx + hx/2.0;
+      x = i*hx - hx/2.0;
       u[j][i].v  = sin(x)*cos(y);
     }
   }
@@ -78,9 +78,9 @@ PetscErrorCode SetInitialPressure(DM da, Vec U, AppCtx *user) {
 
   // p is located at the center of each cell
   for (j=ys; j<ys+ym; j++) {
-    y = j*hy + hy/2.0;
+    y = j*hy - hy/2.0;
     for (i=xs; i<xs+xm; i++) {
-      x = i*hx + hx/2.0;
+      x = i*hx - hx/2.0;
       p[j][i]  = -0.25*(cos(2*x)+cos(2*y));
     }
   }

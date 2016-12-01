@@ -17,8 +17,8 @@ struct F{
     // Setup
     //--------------------------
     // Build the grid
-    grid.mx = 64;
-    grid.my = 64;
+    grid.mx = 128;
+    grid.my = 128;
     grid.Lx = 2*M_PI;
     grid.Ly = 2*M_PI;
     grid.dx = grid.Lx/(grid.mx);
@@ -85,9 +85,9 @@ PetscErrorCode SetUpExactSolution(DM da, Vec U, AppCtx *user) {
   DMDAVecGetArray(da,U,&p);
 
   for (j=ys; j<ys+ym; j++) {
-    y = (j+.5)*hy;
+    y = (j-.5)*hy;
     for (i=xs; i<xs+xm; i++) {
-      x = (i+.5)*hx;
+      x = (i-.5)*hx;
       p[j][i]  = -test_rhs_func(x,y);
     }
   }

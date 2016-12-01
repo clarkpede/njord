@@ -164,8 +164,8 @@ PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
         rhs[j][i] = (dudx + dvdy)/dt;
       } else {
         // NOTE: This section is intended for testing only.
-        x = (i+.5)*hx;
-        y = (j+.5)*hy;
+        x = (i-.5)*hx;
+        y = (j-.5)*hy;
         rhs[j][i] = opt_func(x, y);
       };
     }
