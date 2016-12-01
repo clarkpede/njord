@@ -11,10 +11,12 @@
 #include "Field.h"
 
 extern PetscErrorCode ComputeMatrix(KSP ksp, Mat J, Mat jac, void* ctx);
-extern PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix, AppCtx *user);
+extern PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix,
+                                         MatNullSpace nullspace, AppCtx *user);
 extern PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt,
-                                        Vec RHS, AppCtx *user,
-                                        PetscReal (*opt_func)(PetscReal, PetscReal));
+                                        Vec RHS, MatNullSpace nullspace,
+                                        AppCtx *user, PetscReal (*opt_func)
+                                        (PetscReal, PetscReal));
 
 #undef __FUNCT__
 #define __FUNCT__ "SolvePoisson"
@@ -24,17 +26,21 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   KSP ksp;
   Mat poisson_matrix;
   Vec RHS;
+  MatNullSpace nullspace;
 
   KSPCreate(PETSC_COMM_WORLD, &ksp);
 
+  // Set up the null space (used to make Neumann BCs consistent
+  MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, 0, &nullspace);
+
   // Create the constant matrix for solving a Poisson equation
   DMCreateMatrix(da_p, &poisson_matrix);
-  SetUpPoissonMatrix(da_p, poisson_matrix, user);
+  SetUpPoissonMatrix(da_p, poisson_matrix, nullspace, user);
   KSPSetOperators(ksp, poisson_matrix, poisson_matrix);
 
   // Create the RHS with the calculated divergence of u
   VecDuplicate(user->p, &RHS);
-  SetUpPoissonRHS(da_vel, da_p, dt, RHS, user, opt_func);
+  SetUpPoissonRHS(da_vel, da_p, dt, RHS, nullspace, user, opt_func);
 
   // Set up the remaining KSP settings
   KSPSetDM(ksp, da_p); // Sets the DM used by preconditioners
@@ -53,13 +59,15 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
 //  VecShift(user->p, -1.0*sum/size);
 
   VecDestroy(&RHS);
+  MatNullSpaceDestroy(&nullspace);
 
   return 0;
 }
 
 #undef __FUNCT__
 #define __FUNCT__ "SetUpPoissonMatrix"
-PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix, AppCtx *user) {
+PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix,
+                                  MatNullSpace nullspace, AppCtx *user) {
   PetscInt       i,j,mx,my,xm,ym,xs,ys;
   PetscReal      hx, hy;
   MatStencil     row, col[5];
@@ -115,10 +123,7 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix, AppCtx *user) {
   MatAssemblyEnd(poisson_matrix,MAT_FINAL_ASSEMBLY);
 
   // Fix the singular matrix problem created by the Neumann boundary conditions
-  MatNullSpace nullspace;
-  MatNullSpaceCreate(PETSC_COMM_WORLD,PETSC_TRUE,0,0,&nullspace);
   MatSetNullSpace(poisson_matrix, nullspace);
-  MatNullSpaceDestroy(&nullspace);
 
   return 0;
 }
@@ -126,8 +131,8 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix, AppCtx *user) {
 #undef __FUNCT__
 #define __FUNCT__ "SetUpPoissonRHS"
 PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
-                                 AppCtx *user,
-                                 PetscReal (*opt_func)(PetscReal, PetscReal)){
+                               MatNullSpace nullspace, AppCtx *user,
+                               PetscReal (*opt_func)(PetscReal, PetscReal)){
   Vec local_vel, local_p;
   Field **field;
   PetscScalar **rhs;
@@ -173,10 +178,7 @@ PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
   // Force the right hand side to be consistent for a singular matrix
   // Note that this is really a hack; normally the model would provide you with
   // a consistent RHS
-  MatNullSpace nullspace;
-  MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, 0, &nullspace);
   MatNullSpaceRemove(nullspace,RHS);
-  MatNullSpaceDestroy(&nullspace);
 
   return 0;
 }

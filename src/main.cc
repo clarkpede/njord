@@ -105,7 +105,7 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
   // Parameters
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified runtime options",
                     __FILE__);{
-    param->nu = 1.0/5000;
+    param->nu = 0.0110;
     param->end_time = 1.0;
     PetscOptionsReal("-T","Duration of the simulation","none",param->end_time,
                      &(param->end_time),NULL);
@@ -126,8 +126,8 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified grid options",__FILE__); {
     grid->mx = 32;
     grid->my = 32;
-    grid->Lx = M_PI;
-    grid->Ly = M_PI;
+    grid->Lx = 2*M_PI;
+    grid->Ly = 2*M_PI;
     ierr = PetscOptionsInt("-mx","Grid resolution in x-direction","none",
                            grid->mx,&grid->mx,NULL);
     ierr = PetscOptionsInt("-my","Grid resolution in y-direction","none",
