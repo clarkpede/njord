@@ -137,8 +137,8 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
     grid->dx = grid->Lx/grid->mx;
     grid->dy = grid->Ly/grid->my;
     grid->stencil = DMDA_STENCIL_STAR;
-    grid->bc_x = DM_BOUNDARY_PERIODIC;
-    grid->bc_y = DM_BOUNDARY_PERIODIC;
+    grid->bc_x = DM_BOUNDARY_GHOSTED;
+    grid->bc_y = DM_BOUNDARY_GHOSTED;
     grid->dof = 2;
     grid->stencil_width = 2;
   }

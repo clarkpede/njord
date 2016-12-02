@@ -38,35 +38,22 @@
 
 #include "TimeMarch.h"
 
-enum BoundaryType {
-  NONE,
-  TOP,
-  BOTTOM,
-  LEFT,
-  RIGHT,
-  TOPLEFT,
-  TOPRIGHT,
-  BOTTOMLEFT,
-  BOTTOMRIGHT
-};
-
-
 PetscScalar get_FCu(Field **x, PetscReal hx, PetscReal hy,
                     PetscInt i, PetscInt j) {
   PetscReal      mN, mS, mE, mW;
   PetscReal      uN, uS, uE, uW;
 
-  // Mass flow rates for u control volume
-  mE =  0.5*hy*(x[j][i+1].u   + x[j][i].u);
-  mW = -0.5*hy*(x[j][i-1].u   + x[j][i].u);
-  mN =  0.5*hx*(x[j+1][i-1].v + x[j+1][i].v);
-  mS = -0.5*hx*(x[j][i-1].v   + x[j][i].v);
+    // Mass flow rates for u control volume
+    mE =  0.5*hy*(x[j][i+1].u   + x[j][i].u);
+    mW = -0.5*hy*(x[j][i-1].u   + x[j][i].u);
+    mN =  0.5*hx*(x[j+1][i-1].v + x[j+1][i].v);
+    mS = -0.5*hx*(x[j][i-1].v   + x[j][i].v);
 
-  // Interpolated u velocities
-  uE = 0.5*(x[j][i].u + x[j][i+1].u);
-  uW = 0.5*(x[j][i].u + x[j][i-1].u);
-  uN = 0.5*(x[j][i].u + x[j+1][i].u);
-  uS = 0.5*(x[j][i].u + x[j-1][i].u);
+    // Interpolated u velocities
+    uE = 0.5*(x[j][i].u + x[j][i+1].u);
+    uW = 0.5*(x[j][i].u + x[j][i-1].u);
+    uN = 0.5*(x[j][i].u + x[j+1][i].u);
+    uS = 0.5*(x[j][i].u + x[j-1][i].u);
 
   // U momentum convection, divided by area
   return  (mE*uE + mW*uW + mN*uN + mS*uS)/(hx*hy);
@@ -150,6 +137,7 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
   PetscReal      dUdxE, dUdxW, dUdyN, dUdyS;
   Vec            localX;
   Field          **x, **f;
+  enum BoundaryType bc;
 
   PetscFunctionBeginUser;
   TSGetDM(ts,&da);
@@ -182,13 +170,14 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
   // Compute function over the locally owned part of the grid
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
+
       // Convection fluxes, divided by the area:
       FCu =  get_FCu(x,hx,hy,i,j);
-      FCu =  get_FCv(x,hx,hy,i,j);
+      FCv =  get_FCv(x,hx,hy,i,j);
 
       // Diffusion fluxes, divided by the area:
-      FDu = get_FDu(x,hx,hy,i,j, user->param->nu);
-      FDv = get_FDu(x,hx,hy,i,j, user->param->nu);
+      FDu = get_FDu(x,hx,hy,i,j,user->param->nu);
+      FDv = get_FDv(x,hx,hy,i,j,user->param->nu);
 
       f[j][i].u = -FCu + FDu;
       f[j][i].v = -FCv + FDv;
@@ -278,6 +267,9 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
       TSSetTimeStep(ts_conv, dt);
     }
     TSGetTimeStep(ts_conv,&dt); // In case dt is not set exactly, read it
+
+    UpdateBoundaryConditionsUV(da_vel, user->vel, user);
+    UpdateBoundaryConditionsP(da_p, user->p, user);
 
     Monitor(ts_conv,n,time,user->vel,NULL); // Manually print out monitor data
     TSStep(ts_conv);

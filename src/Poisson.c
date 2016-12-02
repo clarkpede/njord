@@ -57,13 +57,6 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   // Solve the system
   KSPSolve(ksp,RHS,user->p);
 
-  // Normalize the output vector so the mean is zero
-//  PetscInt size;
-//  PetscReal sum;
-//  VecGetSize(user->p, &size);
-//  VecSum(user->p, &sum);
-//  VecShift(user->p, -1.0*sum/size);
-
   VecDestroy(&RHS);
   MatNullSpaceDestroy(&nullspace);
 
@@ -170,8 +163,8 @@ PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
         rhs[j][i] = (dudx + dvdy)/dt;
       } else {
         // NOTE: This section is intended for testing only.
-        x = (i-.5)*hx;
-        y = (j-.5)*hy;
+        x = (i+.5)*hx;
+        y = (j+.5)*hy;
         rhs[j][i] = opt_func(x, y);
       };
     }
@@ -180,6 +173,13 @@ PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
   // Put the array values back into the vectors
   DMDAVecRestoreArray    (da_p,   RHS,       &rhs);
   DMDAVecRestoreArrayRead(da_vel, local_vel, &field);
+
+  // Normalize the output vector so the mean is zero
+  PetscInt size;
+  PetscReal sum;
+  VecGetSize(RHS, &size);
+  VecSum(RHS, &sum);
+  VecShift(RHS, -1.0*sum/size);
 
   // Force the right hand side to be consistent for a singular matrix
   // Note that this is really a hack; normally the model would provide you with
