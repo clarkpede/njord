@@ -120,12 +120,23 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
   // Grid Options
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified grid options",__FILE__); {
     SetGridDefaults(grid);
-    ierr = PetscOptionsInt("-mx","Grid resolution in x-direction","none",
+    PetscOptionsInt("-mx","Grid resolution in x-direction","none",
                            grid->mx,&grid->mx,NULL);
-    ierr = PetscOptionsInt("-my","Grid resolution in y-direction","none",
+    PetscOptionsInt("-my","Grid resolution in y-direction","none",
                            grid->my,&grid->my,NULL);
+    PetscOptionsReal("-Lx","Domain size in x-direction","none",
+                           grid->Lx,&grid->Lx,NULL);
+    PetscOptionsReal("-Ly","Domain size in y-direction","none",
+                           grid->Ly,&grid->Ly,NULL);
   }
   PetscOptionsEnd();
+  // This must be set here, so that the user-specified mx, my, Lx, Ly take
+  // effect.
+  // This is not the usual Lx/(mx-1) because we omit one set of points due
+  // to the staggered grid arrangement.
+  grid->dx = grid->Lx/grid->mx;
+  grid->dy = grid->Ly/grid->my;
+
   return ierr_out;
 
 }
@@ -144,10 +155,12 @@ PetscErrorCode ReportParams(Parameters *param, GridInfo *grid) {
                 "---------------------BEGIN NJORD PARAM REPORT-------------------\n");
     if (param->write_output) {
       PetscPrintf(PETSC_COMM_WORLD,"Writing final solution to: \n");
-      PetscPrintf(PETSC_COMM_WORLD,"    %s", param->outfile);
+      PetscPrintf(PETSC_COMM_WORLD,"    %s\n", param->outfile);
     };
-    PetscPrintf(PETSC_COMM_WORLD,"\nGrid: \n");
+    PetscPrintf(PETSC_COMM_WORLD,"Grid: \n");
     PetscPrintf(PETSC_COMM_WORLD,"    [mx,my]: %D, %D \n", grid->mx, grid->my);
+    PetscPrintf(PETSC_COMM_WORLD,"    [Lx,Ly]: %g, %g \n", grid->Lx, grid->Ly);
+    PetscPrintf(PETSC_COMM_WORLD,"    [dx,dy]: %g, %g \n", grid->dx, grid->dy);
     PetscPrintf(PETSC_COMM_WORLD,
                 "---------------------END NJORD PARAM REPORT-------------------\n");
   }
