@@ -9,6 +9,7 @@
 #include <petscdmda.h>
 
 #include "Poisson.h"
+#include "Boundaries.h"
 #include "Settings.h"
 
 struct F{
@@ -23,6 +24,8 @@ struct F{
 
     SetGridDefaults(&grid);
     SetParamDefaults(&params);
+    user->grid->dx = user->grid->Lx/user->grid->mx;
+    user->grid->dy = user->grid->Ly/user->grid->my;
 
     // Build the DA objects
     // Create a distributed array for the velocities
@@ -91,6 +94,7 @@ BOOST_FIXTURE_TEST_SUITE(Poisson, F)
 BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Constant_Is_Zero ) {
 
   VecSet(user->vel,1.0);
+  UpdateBoundaryConditionsUV(da_vel, user->vel, user);
 
   PetscReal arbitrary_dt = 1.0;
   SolvePoisson(da_vel, da_p, arbitrary_dt, user, NULL);
@@ -107,12 +111,26 @@ BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Trig_Is_Close ) {
   VecDuplicate(user->p, &exact);
   SetUpExactSolution(da_p, exact, user);
 
+  //XXX: Print to file
+  PetscViewer viewer;
+  PetscViewerVTKOpen(PETSC_COMM_WORLD,"output/p_exact.vts",
+                     FILE_MODE_WRITE,&viewer);
+  VecView(exact,viewer);
+  PetscViewerDestroy(&viewer);
+
   PetscReal arbitrary_dt = 1.0;
   SolvePoisson(da_vel, da_p, arbitrary_dt, user, &test_rhs_func);
 
   PetscScalar tol = 1e-3;
   PetscScalar norm;
   PetscInt size;
+
+  //XXX: Print to file
+  PetscViewerVTKOpen(PETSC_COMM_WORLD,"output/p.vts",
+                     FILE_MODE_WRITE,&viewer);
+  VecView(user->p,viewer);
+  PetscViewerDestroy(&viewer);
+
   VecAXPY(user->p,-1.0,exact);
   VecNorm(user->p, NORM_2, &norm);
   VecGetSize(user->p, &size);

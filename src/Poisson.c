@@ -36,6 +36,7 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   // Create the constant matrix for solving a Poisson equation
   DMCreateMatrix(da_p, &poisson_matrix);
   SetUpPoissonMatrix(da_p, poisson_matrix, nullspace, user);
+  //MatView(poisson_matrix, PETSC_VIEWER_STDOUT_WORLD);
   KSPSetOperators(ksp, poisson_matrix, poisson_matrix);
 
   // Create the RHS with the calculated divergence of u
@@ -48,7 +49,8 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   // Set up the incomplete Cholesky factorization preconditioner
   PC pc;
   KSPGetPC(ksp, &pc);
-  PCSetType(pc, PCLU);
+  PCSetType(pc, PCJACOBI);
+  KSPSetType(ksp, KSPBCGS);
 
   // Finish setting up ksp
   KSPSetFromOptions(ksp);
@@ -78,8 +80,10 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix,
   MatStencil     row, col[5];
   PetscReal      v[5];
 
-  hx = user->grid->dy;
-  hy = user->grid->dx;
+  hx = user->grid->dx;
+  hy = user->grid->dy;
+  mx = user->grid->mx;
+  my = user->grid->my;
 
   // Get the start and size of the local array
   DMDAGetCorners(da,&xs,&ys,0,&xm,&ym,0);
@@ -88,7 +92,7 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix,
     for (i=xs; i<xs+xm; i++) {
       // The row of the matrix corresponds to the i,j grid point
       row.i = i; row.j = j;
-      if (i==0 || j==0 || i==mx|| j==my) {
+      if (i==0 || j==0 || i==mx-1 || j==my-1 ) {
         // We are on the boundary, and we need to use homogeneous Neumann BCs
         PetscInt numx = 0, numy = 0, num = 0;
         if (j!=0) {
@@ -99,11 +103,11 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix,
           v[num] = 1/(hx*hx);                col[num].i = i-1; col[num].j = j;
           numx++; num++;
         }
-        if (i!=mx) {
+        if (i!=mx-1) {
           v[num] = 1/(hx*hx);                col[num].i = i+1; col[num].j = j;
           numx++; num++;
         }
-        if (j!=my) {
+        if (j!=my-1) {
           v[num] = 1/(hy*hy);                col[num].i = i;   col[num].j = j+1;
           numy++; num++;
         }
@@ -118,12 +122,13 @@ PetscErrorCode SetUpPoissonMatrix(DM da, Mat poisson_matrix,
         v[1] = 1/(hx*hx);              col[1].i = i-1; col[1].j = j;
         v[2] = -2/(hx*hx) - 2/(hy*hy); col[2].i = i;   col[2].j = j;
         v[3] = 1/(hx*hx);              col[3].i = i+1; col[3].j = j;
-        v[4] = 1/(hx*hx);              col[4].i = i;   col[4].j = j+1;
+        v[4] = 1/(hy*hy);              col[4].i = i;   col[4].j = j+1;
         MatSetValuesStencil(poisson_matrix, 1, &row, 5, col, v, INSERT_VALUES);
       }
     }
   }
 
+  // Fix the null space by setting one value to be = 0;
   MatAssemblyBegin(poisson_matrix,MAT_FINAL_ASSEMBLY);
   MatAssemblyEnd(poisson_matrix,MAT_FINAL_ASSEMBLY);
 
@@ -164,8 +169,8 @@ PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
       if (opt_func == NULL) {
-        dudx = (field[j][i].u - field[j][i-1].u)/hx;
-        dvdy = (field[j][i].v - field[j-1][i].v)/hy;
+        dudx = (field[j][i+1].u - field[j][i].u)/hx;
+        dvdy = (field[j+1][i].v - field[j][i].v)/hy;
         rhs[j][i] = (dudx + dvdy)/dt;
       } else {
         // NOTE: This section is intended for testing only.

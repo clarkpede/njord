@@ -12,10 +12,6 @@ PetscErrorCode SetGridDefaults(GridInfo *grid) {
   grid->my = 64;
   grid->Lx = 2*M_PI;
   grid->Ly = 2*M_PI;
-  // This is not the usual Lx/(mx-1) because we omit one set of points due
-  // to the staggered grid arrangement.
-  grid->dx = grid->Lx/grid->mx;
-  grid->dy = grid->Ly/grid->my;
   grid->stencil = DMDA_STENCIL_STAR;
   grid->bc_x = DM_BOUNDARY_GHOSTED;
   grid->bc_y = DM_BOUNDARY_GHOSTED;
