@@ -46,10 +46,10 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   KSPSetDM(ksp, da_p); // Sets the DM used by preconditioners
   KSPSetDMActive(ksp, PETSC_FALSE); // Tells KSP to keep our matrix
 
-  // Set up the incomplete Cholesky factorization preconditioner
+  // Use the Jacobian preconditioner and the BiCGSTAB solver
   PC pc;
   KSPGetPC(ksp, &pc);
-  PCSetType(pc, PCJACOBI);
+  PCSetType(pc, PCGAMG);
   KSPSetType(ksp, KSPBCGS);
 
   // Finish setting up ksp
