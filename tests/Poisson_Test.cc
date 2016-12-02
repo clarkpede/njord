@@ -85,9 +85,9 @@ PetscErrorCode SetUpExactSolution(DM da, Vec U, AppCtx *user) {
   DMDAVecGetArray(da,U,&p);
 
   for (j=ys; j<ys+ym; j++) {
-    y = (j-.5)*hy;
+    y = (j+.5)*hy;
     for (i=xs; i<xs+xm; i++) {
-      x = (i-.5)*hx;
+      x = (i+.5)*hx;
       p[j][i]  = -test_rhs_func(x,y);
     }
   }

@@ -18,6 +18,7 @@
 #include "Field.h"
 #include "Monitor.h"
 #include "Settings.h"
+#include "Boundaries.h"
 
 #ifdef __cplusplus
 extern "C" {
