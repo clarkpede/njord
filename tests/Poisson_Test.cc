@@ -16,23 +16,13 @@ struct F{
     //--------------------------
     // Setup
     //--------------------------
-    // Build the grid
-    grid.mx = 128;
-    grid.my = 128;
-    grid.Lx = 2*M_PI;
-    grid.Ly = 2*M_PI;
-    grid.dx = grid.Lx/(grid.mx);
-    grid.dy = grid.Ly/(grid.my);
-    grid.dof = 2;
-    grid.bc_x = DM_BOUNDARY_PERIODIC;
-    grid.bc_y = DM_BOUNDARY_PERIODIC;
-    grid.stencil = DMDA_STENCIL_BOX;
-    grid.stencil_width = 2;
-
     // Build the Settings struct
     PetscNew(&user);
     user->grid = &grid;
     user->param = &params;
+
+    SetGridDefaults(&grid);
+    SetParamDefaults(&params);
 
     // Build the DA objects
     // Create a distributed array for the velocities

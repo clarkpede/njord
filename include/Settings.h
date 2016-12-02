@@ -8,6 +8,8 @@
 #ifndef INCLUDE_SETTINGS_H_
 #define INCLUDE_SETTINGS_H_
 
+#include <petscdmda.h>
+
 // All of the user-specified parameters that change execution
 typedef struct {
   PetscReal nu;                        // Kinematic viscosity
@@ -35,5 +37,17 @@ typedef struct {
   GridInfo    *grid;     // Grid information
   Vec         vel, p; // Vectors representing the solution at each time step
 } AppCtx;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+PetscErrorCode SetGridDefaults(GridInfo *grid);
+
+PetscErrorCode SetParamDefaults(Parameters *param);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* INCLUDE_SETTINGS_H_ */

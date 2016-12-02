@@ -17,8 +17,8 @@
 #include "Corrector.h"
 #include "Field.h"
 #include "Monitor.h"
-#include "Settings.h"
 #include "Boundaries.h"
+#include "Settings.h"
 
 #ifdef __cplusplus
 extern "C" {

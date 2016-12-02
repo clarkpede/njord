@@ -48,7 +48,7 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   // Set up the incomplete Cholesky factorization preconditioner
   PC pc;
   KSPGetPC(ksp, &pc);
-  PCSetType(pc, PCICC);
+  PCSetType(pc, PCLU);
 
   // Finish setting up ksp
   KSPSetFromOptions(ksp);
@@ -56,6 +56,12 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
 
   // Solve the system
   KSPSolve(ksp,RHS,user->p);
+  if (user->param->verbose) {
+    PetscInt its;
+    KSPGetIterationNumber(ksp, &its);
+    PetscPrintf(PETSC_COMM_WORLD,
+                "Iterations used for Pressure-Poisson Eqn: %d\n", its);
+  }
 
   VecDestroy(&RHS);
   MatNullSpaceDestroy(&nullspace);
