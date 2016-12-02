@@ -89,7 +89,6 @@ int main(int argc, char* argv[]) {
 }
 //-----------------------------------------------------------------------------
 
-
 /** Sets up the runtime parameters using the options database
  *
  *  See:
@@ -105,18 +104,14 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
   // Parameters
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified runtime options",
                     __FILE__);{
-    param->nu = 0.0110;
-    param->end_time = 1.0;
+    SetParamDefaults(param);
     PetscOptionsReal("-T","Duration of the simulation","none",param->end_time,
                      &(param->end_time),NULL);
-    param->CFL = 0.6;
     PetscOptionsReal("-CFL","CFL number used for time advancement","none",
                      param->CFL,&(param->CFL),NULL);
-    strcpy(param->outfile,"output/average_fields.vts");
     PetscOptionsString("-o","Output solution to a specified *.vts file",
                        "none",param->outfile,param->outfile, PETSC_MAX_PATH_LEN,
                        &param->write_output);
-    param->verbose = PETSC_FALSE;
     PetscOptionsName("-verbose","Print all info during execution.","none",
                      &(param->verbose));
   }
@@ -124,23 +119,11 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
 
   // Grid Options
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified grid options",__FILE__); {
-    grid->mx = 32;
-    grid->my = 32;
-    grid->Lx = 2*M_PI;
-    grid->Ly = 2*M_PI;
+    SetGridDefaults(grid);
     ierr = PetscOptionsInt("-mx","Grid resolution in x-direction","none",
                            grid->mx,&grid->mx,NULL);
     ierr = PetscOptionsInt("-my","Grid resolution in y-direction","none",
                            grid->my,&grid->my,NULL);
-    // This is not the usual Lx/(mx-1) because we omit one set of points due
-    // to the staggered grid arrangement.
-    grid->dx = grid->Lx/grid->mx;
-    grid->dy = grid->Ly/grid->my;
-    grid->stencil = DMDA_STENCIL_STAR;
-    grid->bc_x = DM_BOUNDARY_GHOSTED;
-    grid->bc_y = DM_BOUNDARY_GHOSTED;
-    grid->dof = 2;
-    grid->stencil_width = 2;
   }
   PetscOptionsEnd();
   return ierr_out;
