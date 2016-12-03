@@ -25,10 +25,8 @@ int main(int argc, char* argv[]) {
   Parameters param;  // Physical and other parameters
   GridInfo grid;     // Parameters defining the grid
   PetscErrorCode ierr;
-  MPI_Comm comm;
 
   PetscInitialize(&argc, &argv,(char*)0, help);
-  comm = PETSC_COMM_WORLD;
 
   // Set up the problem parameters
   SetParams(&param,&grid);
@@ -40,9 +38,9 @@ int main(int argc, char* argv[]) {
   user->grid =  &grid;
 
   // Create a distributed array for the velocities
-  DMDACreate2d(comm, grid.bc_x, grid.bc_y, grid.stencil, grid.mx, grid.my,
-               PETSC_DECIDE, PETSC_DECIDE, grid.dof, grid.stencil_width,
-               0,0,&da_vel);
+  DMDACreate2d(PETSC_COMM_WORLD, grid.bc_x, grid.bc_y, grid.stencil,
+               grid.mx, grid.my, PETSC_DECIDE, PETSC_DECIDE,
+               grid.dof, grid.stencil_width, 0,0,&da_vel);
   DMSetApplicationContext(da_vel,user);
   DMDASetFieldName(da_vel,0,"x mean velocity");
   DMDASetFieldName(da_vel,1,"y mean velocity");
@@ -115,6 +113,10 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
     PetscOptionsName("-verbose","Print all info during execution.","none",
                      &(param->verbose));
   }
+  // If "-o" is specified and no output file is named, reset to default.
+  if (param->write_output && strlen(param->outfile)==0) {
+    strcpy(param->outfile,"output/average_fields.vts");
+  }
   PetscOptionsEnd();
 
   // Grid Options
@@ -153,6 +155,9 @@ PetscErrorCode ReportParams(Parameters *param, GridInfo *grid) {
   if (param->verbose) {
     PetscPrintf(PETSC_COMM_WORLD,
                 "---------------------BEGIN NJORD PARAM REPORT-------------------\n");
+    PetscPrintf(PETSC_COMM_WORLD,"Runtime parameters:\n");
+    PetscPrintf(PETSC_COMM_WORLD,"    CFL:      %g\n", param->CFL);
+    PetscPrintf(PETSC_COMM_WORLD,"    End time: %g\n", param->end_time);
     if (param->write_output) {
       PetscPrintf(PETSC_COMM_WORLD,"Writing final solution to: \n");
       PetscPrintf(PETSC_COMM_WORLD,"    %s\n", param->outfile);

@@ -123,8 +123,8 @@ PetscReal get_FDv(Field **x, PetscReal hx, PetscReal hy,
  * @return Returns a zero if the function executes successfully.
  */
 #undef __FUNCT__
-#define __FUNCT__ "FormFunction"
-PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
+#define __FUNCT__ "FormTimeDerivativeFunction"
+PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
   AppCtx         *user = (AppCtx*)ptr;
   DM             da;
   PetscInt       i,j,Mx,My,xs,ys,xm,ym;
@@ -171,16 +171,20 @@ PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void *ptr) {
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
 
-      // Convection fluxes, divided by the area:
-      FCu =  get_FCu(x,hx,hy,i,j);
-      FCv =  get_FCv(x,hx,hy,i,j);
-
-      // Diffusion fluxes, divided by the area:
-      FDu = get_FDu(x,hx,hy,i,j,user->param->nu);
-      FDv = get_FDv(x,hx,hy,i,j,user->param->nu);
-
-      f[j][i].u = -FCu + FDu;
-      f[j][i].v = -FCv + FDv;
+      if (i==0 || i==Mx-1) {
+        f[j][i].u = 0;
+      } else {
+        FCu =  get_FCu(x,hx,hy,i,j);
+        FDu = get_FDu(x,hx,hy,i,j,user->param->nu);
+        f[j][i].u = -FCu + FDu;
+      }
+      if (j==0 || j==My-1) {
+        f[j][i].v = 0;
+      } else {
+        FCv = get_FCv(x,hx,hy,i,j);
+        FDv = get_FDv(x,hx,hy,i,j,user->param->nu);
+        f[j][i].v = -FCv + FDv;
+      }
     }
   }
 
@@ -212,16 +216,81 @@ PetscErrorCode get_dt(DM da, Vec U, PetscReal* dt, AppCtx* user){
 
   hx = user->grid->dx;
 
+  // Stability limit for Euler forward with linear convection
   VecMax(U,NULL,&max_vel);
   dt_conv = user->param->CFL*hx/(max_vel);
 
+  // Stability limit for Euler forward with linear diffusion
   dt_diff = user->param->CFL*(hx*hx)/user->param->nu;
 
-  // Return the smaller of the two
+  // Set the smaller of the two as an output
   *dt = ((dt_conv < dt_diff) ? dt_conv: dt_diff);
 
   return 0;
 }
+
+PetscErrorCode Prestep(TS ts) {
+  PetscReal dt;
+  DM        da_vel, da_p;
+  AppCtx*   user;
+
+  // Unpack the application state from TS
+  TSGetApplicationContext(ts, &user);
+  TSGetDM(ts, &da_vel);
+  DMDAGetReducedDMDA(da_vel, 1, &da_p);
+  DMSetApplicationContext(da_p,user);
+
+  // Recompute the time step based on the CFL condition
+  get_dt(da_vel, user->vel, &dt, user);
+  TSSetTimeStep(ts, dt);
+
+  UpdateBoundaryConditionsUV(da_vel, user->vel, user);
+
+  return 0;
+}
+
+PetscErrorCode PressureCorrection(TS ts) {
+  PetscReal dt;
+  DM da_vel, da_p;
+  AppCtx* user;
+  PetscInt timestep_number;
+
+  // Unpack the application state from TS
+  TSGetTimeStep(ts, &dt);
+  TSGetTimeStepNumber(ts, &timestep_number);
+  TSGetApplicationContext(ts, &user);
+  TSGetDM(ts, &da_vel);
+  DMDAGetReducedDMDA(da_vel, 1, &da_p);
+  DMSetApplicationContext(da_p,user);
+
+  // Solves the Poisson equation and stores the result in user->p
+  SolvePoisson(da_vel, da_p, dt, user, NULL);
+  // Pressure ghost cells need to be updated to get grad(p) at left/bottom
+  UpdateBoundaryConditionsP(da_p, user->p, user);
+  CorrectVelocities(da_vel, da_p, dt, user);
+
+  // Output to a *.vts file.
+  if(user->param->write_output) {
+    char filename[128];
+    char* name = "output/solution";
+    char num[5];
+    char* ext  = ".vts";
+
+    // Build the filename
+    sprintf(num, "%1d", timestep_number);
+    strncpy(filename, name, sizeof(filename));
+    strncat(filename, num, (sizeof(filename) - strlen(filename)));
+    strncat(filename, ext, (sizeof(filename) - strlen(filename)));
+
+    PetscViewer viewer;
+    PetscViewerVTKOpen(PETSC_COMM_WORLD,filename,FILE_MODE_WRITE,&viewer);
+    VecView(user->vel,viewer);
+    PetscViewerDestroy(&viewer);
+  }
+
+  return 0;
+
+};
 
 /** Advances the solution forward in time.
  *
@@ -235,6 +304,9 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   PetscReal dt, time;
   PetscInt kMaxSteps = 1000;
   PetscInt n;
+  TSType time_scheme;
+  Mat Jac=NULL;
+  Mat Jmf=NULL;
 
   //---------------------------------------------------------------------------
   // Set up timestepper
@@ -242,11 +314,14 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   TSCreate(PETSC_COMM_WORLD, &ts_conv);
   TSSetDM(ts_conv, da_vel);
   TSSetProblemType(ts_conv,TS_NONLINEAR);
-  TSSetRHSFunction(ts_conv,NULL,FormFunction,user);
-  TSSetType(ts_conv, TSRK);
+  TSSetType(ts_conv, TSCN);
   TSGetSNES(ts_conv,&snes);
   TSSetSolution(ts_conv, user->vel);
-  if (user->param->verbose) TSMonitorSet(ts_conv,Monitor,NULL,NULL);
+
+  TSSetRHSFunction(ts_conv,NULL,FormTimeDerivativeFunction,user);
+
+  // Print information about the time-stepper
+  TSMonitorSet(ts_conv,Monitor,NULL,NULL);
 
   // Set the initial time step
   time = 0.0;
@@ -256,50 +331,23 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   TSSetExactFinalTime(ts_conv, TS_EXACTFINALTIME_MATCHSTEP);
 
   // Update with user-defined options
+  TSSetApplicationContext(ts_conv, user);
   TSSetFromOptions(ts_conv);
+  // Set up the Jacobian, if an implicit method is to be used
+  TSGetType(ts_conv, &time_scheme);
+  if (strcmp(time_scheme,TSCN) || strcmp(time_scheme,TSBEULER)) {
+    DMCreateMatrix(da_vel,&Jac);
+    MatCreateSNESMF(snes,&Jmf);
+    SNESSetJacobian(snes,Jmf,Jac,SNESComputeJacobianDefaultColor,0);
+  }
   if (user->param->verbose) TSView(ts_conv,PETSC_VIEWER_STDOUT_WORLD);
 
-  n = 0;
-  while (time < user->param->end_time) {
-    if (time > 0.0) {
-      // Recompute the time step based on the CFL condition
-      get_dt(da_vel, user->vel, &dt, user);
-      TSSetTimeStep(ts_conv, dt);
-    }
-    TSGetTimeStep(ts_conv,&dt); // In case dt is not set exactly, read it
+  // Use a pre-step so we can update BCs and set a variable time step
+  // Use the pressure correction as a post-step
+  TSSetPreStep(ts_conv, Prestep);
+  TSSetPostStep(ts_conv, PressureCorrection);
 
-    UpdateBoundaryConditionsUV(da_vel, user->vel, user);
-    UpdateBoundaryConditionsP(da_p, user->p, user);
-
-    Monitor(ts_conv,n,time,user->vel,NULL); // Manually print out monitor data
-    TSStep(ts_conv);
-
-    // Solves the Poisson equation and stores the result in user->p
-    SolvePoisson(da_vel, da_p, dt, user, NULL);
-    CorrectVelocities(da_vel, da_p, dt, user);
-
-    // Output to a *.vts file.
-    if(user->param->write_output) {
-      char filename[128];
-      char* name = "output/solution";
-      char num[5];
-      char* ext  = ".vts";
-
-      // Build the filename
-      sprintf(num, "%1d", n);
-      strncpy(filename, name, sizeof(filename));
-      strncat(filename, num, (sizeof(filename) - strlen(filename)));
-      strncat(filename, ext, (sizeof(filename) - strlen(filename)));
-
-      PetscViewer viewer;
-      PetscViewerVTKOpen(PETSC_COMM_WORLD,filename,FILE_MODE_WRITE,&viewer);
-      VecView(user->vel,viewer);
-      PetscViewerDestroy(&viewer);
-    }
-
-    time += dt;
-    n++;
-  }
+  TSSolve(ts_conv, user->vel);
 
   return 0;
 }
