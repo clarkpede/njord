@@ -27,6 +27,10 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   Mat poisson_matrix;
   Vec RHS;
   MatNullSpace nullspace;
+  PetscLogEvent USER_EVENT;
+
+  PetscLogEventRegister("Poisson Solver  ",0,&USER_EVENT);
+  PetscLogEventBegin(USER_EVENT,0,0,0,0);
 
   KSPCreate(PETSC_COMM_WORLD, &ksp);
 
@@ -67,6 +71,8 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
 
   VecDestroy(&RHS);
   MatNullSpaceDestroy(&nullspace);
+
+  PetscLogEventEnd(USER_EVENT,0,0,0,0);
 
   return 0;
 }

@@ -16,6 +16,10 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
   PetscReal hx, hy;
   PetscReal dpdx, dpdy;
   PetscInt xs,ys,xm,ym,i,j;
+  PetscLogEvent USER_EVENT;
+
+  PetscLogEventRegister("Correct Vel.    ",0,&USER_EVENT);
+  PetscLogEventBegin(USER_EVENT,0,0,0,0);
 
   hx = user->grid->dx;
   hy = user->grid->dy;
@@ -45,6 +49,8 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
   // Put the array values back into the vectors
   DMDAVecRestoreArrayRead(da_p,   local_p,   &p);
   DMDAVecRestoreArray    (da_vel, user->vel, &vel);
+
+  PetscLogEventEnd(USER_EVENT,0,0,0,0);
 
   return 0;
 }
