@@ -10,8 +10,8 @@
 PetscErrorCode SetGridDefaults(GridInfo *grid) {
   grid->mx = 64;
   grid->my = 64;
-  grid->Lx = 2*M_PI;
-  grid->Ly = 2*M_PI;
+  grid->Lx = M_PI;
+  grid->Ly = M_PI;
   grid->stencil = DMDA_STENCIL_STAR;
   grid->bc_x = DM_BOUNDARY_GHOSTED;
   grid->bc_y = DM_BOUNDARY_GHOSTED;
@@ -21,10 +21,11 @@ PetscErrorCode SetGridDefaults(GridInfo *grid) {
 }
 
 PetscErrorCode SetParamDefaults(Parameters *param) {
-  param->nu = 0.01;
+  param->nu = 0.05;
   param->end_time = 1.0;
   param->CFL = 0.6;
   param->verbose = PETSC_FALSE;
+  param->write_output = PETSC_FALSE;
   strcpy(param->outfile,"output/average_fields.vts");
   return 0;
 }
