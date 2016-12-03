@@ -246,6 +246,10 @@ PetscErrorCode Prestep(TS ts) {
 
   UpdateBoundaryConditionsUV(da_vel, user->vel, user);
 
+  // Set up profiling for the time-integration:
+  PetscLogEventRegister("Time Integration",0,&user->current_event);
+  PetscLogEventBegin(user->current_event,0,0,0,0);
+
   return 0;
 }
 
@@ -255,10 +259,13 @@ PetscErrorCode PressureCorrection(TS ts) {
   AppCtx* user;
   PetscInt timestep_number;
 
+  //End profiling for the time-integration:
+  TSGetApplicationContext(ts, &user);
+  PetscLogEventEnd(user->current_event,0,0,0,0);
+
   // Unpack the application state from TS
   TSGetTimeStep(ts, &dt);
   TSGetTimeStepNumber(ts, &timestep_number);
-  TSGetApplicationContext(ts, &user);
   TSGetDM(ts, &da_vel);
   DMDAGetReducedDMDA(da_vel, 1, &da_p);
   DMSetApplicationContext(da_p,user);
@@ -333,6 +340,7 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   // Update with user-defined options
   TSSetApplicationContext(ts_conv, user);
   TSSetFromOptions(ts_conv);
+
   // Set up the Jacobian, if an implicit method is to be used
   TSGetType(ts_conv, &time_scheme);
   if (strcmp(time_scheme,TSCN) || strcmp(time_scheme,TSBEULER)) {
@@ -340,6 +348,8 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
     MatCreateSNESMF(snes,&Jmf);
     SNESSetJacobian(snes,Jmf,Jac,SNESComputeJacobianDefaultColor,0);
   }
+
+  // Print the information about the time-stepper
   if (user->param->verbose) TSView(ts_conv,PETSC_VIEWER_STDOUT_WORLD);
 
   // Use a pre-step so we can update BCs and set a variable time step

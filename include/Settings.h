@@ -36,6 +36,7 @@ typedef struct {
   Parameters  *param;    // Runtime parameters
   GridInfo    *grid;     // Grid information
   Vec         vel, p; // Vectors representing the solution at each time step
+  PetscLogEvent current_event;
 } AppCtx;
 
 #ifdef __cplusplus
