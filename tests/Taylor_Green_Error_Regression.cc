@@ -21,7 +21,7 @@ PetscReal exact_v(PetscReal x, PetscReal y, PetscReal t) {
   return std::sin(x)*std::cos(y)*std::exp(-2*t);
 }
 
-void RunTest(PetscInt mx, PetscInt my, PetscReal* Linf_err) {
+void RunTest(PetscInt mx, PetscInt my, PetscReal* L2_err, PetscReal* Linf_err) {
   DM    da_vel, da_p;
   TS    ts;
   AppCtx *user;      // User defined work context
@@ -71,6 +71,7 @@ void RunTest(PetscInt mx, PetscInt my, PetscReal* Linf_err) {
   TSGetTime(ts,&time);
   VecDuplicate(user->vel, &exact);
   SetUpExactSolutionUV(da_vel, exact, time, &exact_u, &exact_v, user);
+  GetErrorNorm(exact, user->vel, NORM_2, L2_err);
   GetErrorNorm(exact, user->vel, NORM_INFINITY, Linf_err);
   PetscPrintf(PETSC_COMM_WORLD,"Linf Error:\t%g\n",*Linf_err);
 
@@ -83,12 +84,27 @@ void RunTest(PetscInt mx, PetscInt my, PetscReal* Linf_err) {
 }
 
 BOOST_AUTO_TEST_CASE( Taylor_Green_Spatial_Convergence) {
-  PetscReal err[2];
+  PetscReal L2_err[3], Linf_err[3];
 
-  RunTest(20,20,&err[0]);
-  RunTest(40,40,&err[1]);
+  RunTest(16,16,&L2_err[0],&Linf_err[0]);
+  RunTest(32,32,&L2_err[1],&Linf_err[1]);
+  RunTest(64,64,&L2_err[2],&Linf_err[2]);
 
-  BOOST_CHECK(err[1] < err[0]);
+  PetscReal L2_rate_1 = std::log(L2_err[0]/L2_err[1])/std::log(2);
+  PetscReal L2_rate_2 = std::log(L2_err[1]/L2_err[2])/std::log(2);
+  PetscPrintf(PETSC_COMM_WORLD,"L2 Convergence rates:\t%g and %g\n",
+              L2_rate_1, L2_rate_2);
+
+  PetscReal Linf_rate_1 = std::log(Linf_err[0]/Linf_err[1])/std::log(2);
+  PetscReal Linf_rate_2 = std::log(Linf_err[1]/Linf_err[2])/std::log(2);
+  PetscPrintf(PETSC_COMM_WORLD,"Linf Convergence rates:\t%g and %g\n",
+              Linf_rate_1, Linf_rate_2);
+
+  PetscReal tol = .05;
+  BOOST_CHECK_SMALL(L2_rate_1-2.0,tol);
+  BOOST_CHECK_SMALL(L2_rate_2-2.0,tol);
+  BOOST_CHECK_SMALL(Linf_rate_1-2.0,tol);
+  BOOST_CHECK_SMALL(Linf_rate_2-2.0,tol);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
