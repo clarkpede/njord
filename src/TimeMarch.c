@@ -9,15 +9,15 @@
  *-----------------------------------------------------------------------------
  * U Control Volume
  *
-   * v_i-1,j+1       v_i,j+1
-   *  |^|--------------|^|
-   *   |                |
-   *   |                |
-   * p_i-1,j   u_ij    p_ij
-   *   |                |
-   *   |                |
-   *  |^|--------------|^|
-   * v_i-1,j          v_ij
+ * v_i-1,j+1       v_i,j+1
+ *  |^|--------------|^|
+ *   |                |
+ *   |                |
+ * p_i-1,j   u_ij    p_ij
+ *   |                |
+ *   |                |
+ *  |^|--------------|^|
+ * v_i-1,j          v_ij
  *
  *-----------------------------------------------------------------------------
  *
@@ -38,75 +38,123 @@
 
 #include "TimeMarch.h"
 
-PetscScalar get_FCu(Field **x, PetscReal hx, PetscReal hy,
-                    PetscInt i, PetscInt j) {
+PetscScalar get_FCu(Field **field, PetscReal hx, PetscReal hy, PetscInt i,
+                    PetscInt j, enum BoundaryType bc_type,
+                    BCs U_BCs, BCs V_BCs) {
   PetscReal      mN, mS, mE, mW;
   PetscReal      uN, uS, uE, uW;
+  PetscReal      x,y;
+  PetscReal      t = 0.0;
 
-    // Mass flow rates for u control volume
-    mE =  0.5*hy*(x[j][i+1].u   + x[j][i].u);
-    mW = -0.5*hy*(x[j][i-1].u   + x[j][i].u);
-    mN =  0.5*hx*(x[j+1][i-1].v + x[j+1][i].v);
-    mS = -0.5*hx*(x[j][i-1].v   + x[j][i].v);
+  if (bc_type == TOP) {
+    x = i*hx; y = (j+1)*hy;
+    mN = hx*V_BCs.top(x,y,t);
+    uN = U_BCs.top(x,y,t);
+  } else {
+    mN =  0.5*hx*(field[j+1][i-1].v + field[j+1][i].v);
+    uN = 0.5*(field[j][i].u + field[j+1][i].u);
+  }
 
-    // Interpolated u velocities
-    uE = 0.5*(x[j][i].u + x[j][i+1].u);
-    uW = 0.5*(x[j][i].u + x[j][i-1].u);
-    uN = 0.5*(x[j][i].u + x[j+1][i].u);
-    uS = 0.5*(x[j][i].u + x[j-1][i].u);
+  if (bc_type == BOTTOM) {
+    x = i*hx; y = 0;
+    mS = -hx*V_BCs.top(x,y,t);
+    uS = U_BCs.top(x,y,t);
+  } else {
+    mS = -0.5*hx*(field[j][i-1].v   + field[j][i].v);
+    uS = 0.5*(field[j][i].u + field[j-1][i].u);
+  }
+
+  if (bc_type == LEFT) {
+    x = 0; y = (j+0.5)*hy;
+    mW = -hy*U_BCs.left(x,y,t);
+    uW = U_BCs.left(x,y,t);
+  } else {
+    mW = -0.5*hy*(field[j][i-1].u   + field[j][i].u);
+    uW = 0.5*(field[j][i].u + field[j][i-1].u);
+  }
+
+  if (bc_type == RIGHT) {
+    x = (i+1)*hx; y = (j+0.5)*hy;
+    mE = hy*U_BCs.right(x,y,t);
+    uE = U_BCs.right(x,y,t);
+  } else {
+    mE =  0.5*hy*(field[j][i+1].u   + field[j][i].u);
+    uE = 0.5*(field[j][i].u + field[j][i+1].u);
+  }
 
   // U momentum convection, divided by area
   return  (mE*uE + mW*uW + mN*uN + mS*uS)/(hx*hy);
 }
 
 
-PetscScalar get_FCv(Field **x, PetscReal hx, PetscReal hy,
-                    PetscInt i, PetscInt j) {
+PetscScalar get_FCv(Field **field, PetscReal hx, PetscReal hy, PetscInt i,
+                    PetscInt j, enum BoundaryType bc_type, BCs U_BCs, BCs V_BCs) {
   PetscReal      mN, mS, mE, mW;
   PetscReal      vN, vS, vE, vW;
+  PetscReal      x,y;
+  PetscReal      t = 0.0;
 
-  // Mass flow rates for v control volume
-  mE =  0.5*hy*(x[j-1][i+1].u   + x[j][i+1].u);
-  mW = -0.5*hy*(x[j][i].u       + x[j-1][i].u);
-  mN =  0.5*hx*(x[j][i].v       + x[j+1][i].v);
-  mS = -0.5*hx*(x[j][i].v       + x[j-1][i].v);
+  if (bc_type==TOP) {
+    x = i*hx; y = (j+1)*hy;
+    mN = hx*V_BCs.top(x,y,t);
+    vN = V_BCs.top(x,y,t);
+  } else {
+    mN =  0.5*hx*(field[j][i].v       + field[j+1][i].v);
+    vN = 0.5*(field[j][i].v + field[j+1][i].v);
+  }
 
-  // Interpolated v velocities
-  vE = 0.5*(x[j][i].v + x[j][i+1].v);
-  vW = 0.5*(x[j][i].v + x[j][i-1].v);
-  vN = 0.5*(x[j][i].v + x[j+1][i].v);
-  vS = 0.5*(x[j][i].v + x[j-1][i].v);
+  if (bc_type==BOTTOM) {
 
-  // V momentum convection, divided by area
+  } else {
+    mS = -0.5*hx*(field[j][i].v       + field[j-1][i].v);
+    vS = 0.5*(field[j][i].v + field[j-1][i].v);
+  }
+
+  if (bc_type==LEFT) {
+
+  } else {
+    mW = -0.5*hy*(field[j][i].u       + field[j-1][i].u);
+    vW = 0.5*(field[j][i].v + field[j][i-1].v);
+  }
+
+  if (bc_type==RIGHT) {
+
+  } else {
+    mE =  0.5*hy*(field[j-1][i+1].u   + field[j][i+1].u);
+    vE = 0.5*(field[j][i].v + field[j][i+1].v);
+  }
+
   return (mE*vE + mW*vW + mN*vN + mS*vS)/(hx*hy);
 }
 
-PetscReal get_FDu(Field **x, PetscReal hx, PetscReal hy,
-                  PetscInt i, PetscInt j, PetscReal nu) {
+PetscReal get_FDu(Field **field, PetscReal hx, PetscReal hy, PetscInt i,
+                  PetscInt j, PetscReal nu, enum BoundaryType bc_type,
+                  BCs U_BCs, BCs V_BCs) {
   PetscReal FDu;
   PetscReal dUdyN, dUdyS, dUdxE, dUdxW;
 
   // U diffusion from momentum equation:
-  dUdxE = (x[j][i+1].u - x[j][i].u)/hx;
-  dUdxW = (x[j][i].u   - x[j][i-1].u)/hx;
-  dUdyN = (x[j+1][i].u - x[j][i].u)/hy;
-  dUdyS = (x[j][i].u   - x[j-1][i].u)/hy;
+  dUdxE = (field[j][i+1].u - field[j][i].u)/hx;
+  dUdxW = (field[j][i].u   - field[j][i-1].u)/hx;
+  dUdyN = (field[j+1][i].u - field[j][i].u)/hy;
+  dUdyS = (field[j][i].u   - field[j-1][i].u)/hy;
 
   FDu = nu * (dUdxE*hy - dUdxW*hy + dUdyN*hx - dUdyS*hx);
   FDu /= (hx*hy);
   return FDu;
 }
 
-PetscReal get_FDv(Field **x, PetscReal hx, PetscReal hy,
-                  PetscInt i, PetscInt j, PetscReal nu) {
+PetscReal get_FDv(Field **field, PetscReal hx, PetscReal hy, PetscInt i,
+                  PetscInt j, PetscReal nu, enum BoundaryType bc_type,
+                  BCs U_BCs, BCs V_BCs) {
   PetscReal FDv;
   PetscReal dVdyN, dVdyS, dVdxE, dVdxW;
 
   // V momentum equation:
-  dVdxE = (x[j][i+1].v - x[j][i].v)/hx;
-  dVdxW = (x[j][i].v   - x[j][i-1].v)/hx;
-  dVdyN = (x[j+1][i].v - x[j][i].v)/hy;
-  dVdyS = (x[j][i].v   - x[j-1][i].v)/hy;
+  dVdxE = (field[j][i+1].v - field[j][i].v)/hx;
+  dVdxW = (field[j][i].v   - field[j][i-1].v)/hx;
+  dVdyN = (field[j+1][i].v - field[j][i].v)/hy;
+  dVdyS = (field[j][i].v   - field[j-1][i].v)/hy;
 
   FDv = nu * (dVdxE*hy - dVdxW*hy + dVdyN*hx - dVdyS*hx);
   FDv /= (hx*hy);
@@ -132,7 +180,8 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   PetscReal      FCu, FDu, FDv, FCv;
   Vec            localX;
   Field          **x, **f;
-  enum BoundaryType bc;
+  enum BoundaryType bc_type;
+  BCs U_BCs, V_BCs;
 
   PetscFunctionBeginUser;
   TSGetDM(ts,&da);
@@ -145,6 +194,8 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   // nodal points to maintain consistent u,v,p array sizes.
   hx = user->grid->Lx/(PetscReal)(Mx);
   hy = user->grid->Ly/(PetscReal)(My);
+
+  SetUpTGVortexBCs(&U_BCs, &V_BCs);
 
   /*
        Scatter ghost points to local vector,using the 2-step process
@@ -165,18 +216,19 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   // Compute function over the locally owned part of the grid
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
+      GetBoundaryType(i,j,Mx,My,&bc_type);
       if (i==0 || i==Mx-1) {
         f[j][i].u = 0;
       } else {
-        FCu =  get_FCu(x,hx,hy,i,j);
-        FDu = get_FDu(x,hx,hy,i,j,user->param->nu);
+        FCu =  get_FCu(x,hx,hy,i,j,bc_type,U_BCs,V_BCs);
+        FDu = get_FDu(x,hx,hy,i,j,user->param->nu,bc_type,U_BCs,V_BCs);
         f[j][i].u = -FCu + FDu;
       }
       if (j==0 || j==My-1) {
         f[j][i].v = 0;
       } else {
-        FCv = get_FCv(x,hx,hy,i,j);
-        FDv = get_FDv(x,hx,hy,i,j,user->param->nu);
+        FCv = get_FCv(x,hx,hy,i,j,bc_type,U_BCs,V_BCs);
+        FDv = get_FDv(x,hx,hy,i,j,user->param->nu,bc_type,U_BCs,V_BCs);
         f[j][i].v = -FCv + FDv;
       }
     }
