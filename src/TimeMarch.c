@@ -220,11 +220,13 @@ PetscErrorCode get_dt(DM da, Vec U, PetscReal* dt, AppCtx* user){
   // Set the smaller of the two as an output
   *dt = ((dt_conv < dt_diff) ? dt_conv: dt_diff);
 
+  *dt = dt_conv;
+
   return 0;
 }
 
 PetscErrorCode Prestep(TS ts) {
-  PetscReal dt;
+  PetscReal dt, time;
   DM        da_vel, da_p;
   AppCtx*   user;
 
@@ -238,7 +240,9 @@ PetscErrorCode Prestep(TS ts) {
   get_dt(da_vel, user->vel, &dt, user);
   TSSetTimeStep(ts, dt);
 
-  UpdateBoundaryConditionsUV(da_vel, user->vel, user);
+  TSGetTime(ts,&time);
+
+  UpdateBoundaryConditionsUV(da_vel, user->vel, time, user);
 
   // Set up profiling for the time-integration:
   PetscLogEventRegister("Time Integration",0,&user->current_event);

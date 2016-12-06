@@ -36,15 +36,16 @@ PetscErrorCode GetBoundaryType(PetscInt i, PetscInt j,PetscInt mx,
   return 0;
 }
 
-PetscReal BC_U(PetscReal x, PetscReal y) {
-  return -cos(x)*sin(y);
+PetscReal BC_U(PetscReal x, PetscReal y, PetscReal t, PetscReal nu) {
+  return -cos(x)*sin(y)*exp(-2*nu*t);
 }
 
-PetscReal BC_V(PetscReal x, PetscReal y) {
-  return sin(x)*cos(y);
+PetscReal BC_V(PetscReal x, PetscReal y, PetscReal t, PetscReal nu) {
+  return sin(x)*cos(y)*exp(-2*nu*t);
 }
 
-PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, AppCtx *user) {
+PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, PetscReal time,
+                                          AppCtx *user) {
   PetscInt i, j, mx, my, xs, ys, xm, ym;
   Vec u_local;
   Field **field;
@@ -75,14 +76,14 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, AppCtx *user) {
       if (bc == NONE) continue;
       if (bc==BOTTOM) {
         x = i*hx; y = 0;
-        field[j][i].u = 2*BC_U(x,y) - field[j+1][i].u;
+        field[j][i].u = 2*BC_U(x,y,time,user->param->nu) - field[j+1][i].u;
       } else if (bc==TOP) {
         x = i*hx; y = my*hy;
-        field[j][i].u = 2*BC_U(x,y) - field[j-1][i].u;
+        field[j][i].u = 2*BC_U(x,y,time,user->param->nu) - field[j-1][i].u;
       } else if (bc==RIGHT) {
         // Used for pressure-poisson RHS calc
         x = mx*hx; y = (j+0.5)*hy;
-        field[j][i].u = BC_U(x,y);
+        field[j][i].u = BC_U(x,y,time,user->param->nu);
       }
     }
   }
@@ -95,13 +96,13 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, AppCtx *user) {
       if (bc==TOP) {
         // Used for pressure-poisson RHS calc
         y = my*hy; x = (i+0.5)*hx;
-        field[j][i].v = BC_V(x,y);
+        field[j][i].v = BC_V(x,y,time,user->param->nu);
       } else if (bc==LEFT) {
         x = 0; y = j*hy;
-        field[j][i].v = 2*BC_V(x,y) - field[j][i+1].v;
+        field[j][i].v = 2*BC_V(x,y,time,user->param->nu) - field[j][i+1].v;
       } else if (bc==RIGHT) {
         x = my*hy; y = j*hy;
-        field[j][i].v = BC_V(x,y);
+        field[j][i].v = BC_V(x,y,time,user->param->nu);
       }
     }
   }
@@ -142,6 +143,7 @@ PetscErrorCode UpdateBoundaryConditionsP(DM da_p, Vec P, AppCtx *user) {
       // Corner, top, and right BCs aren't needed
       // Top and left aren't needed because of the missing cells
       // (No need to solve grad(p) for missing quantities)
+      // All we're doing here is enforcing the Neumann BCs on pressure.
       GetBoundaryType(i,j,mx,my,&bc);
       if (bc==LEFT) {
         p[j][i] = p[j][i+1];

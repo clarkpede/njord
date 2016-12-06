@@ -60,7 +60,8 @@ PetscErrorCode GetBoundaryType(PetscInt i, PetscInt j, PetscInt mx,
  * --Outputs--
  * @return Returns 0 if the function finishes execution.
  */
-PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, AppCtx *user);
+PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, PetscReal time,
+                                          AppCtx *user);
 
 /** Updates the ghost cells so that the homogeneous Neumann BCs on pressure
  * are satisfied.
