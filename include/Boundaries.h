@@ -19,6 +19,13 @@ extern "C" {
 #include "Settings.h"
 #include "Field.h"
 
+typedef struct {
+  PetscReal (*left)(PetscReal, PetscReal, PetscReal);
+  PetscReal (*right)(PetscReal, PetscReal, PetscReal);
+  PetscReal (*top)(PetscReal, PetscReal, PetscReal);
+  PetscReal (*bottom)(PetscReal, PetscReal, PetscReal);
+} BCs;
+
 // Represents the type of boundary represented by a particular ghost cell.
 enum BoundaryType {
   NONE,      //!< NONE
@@ -72,6 +79,8 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, PetscReal time,
  * @return
  */
 PetscErrorCode UpdateBoundaryConditionsP(DM da_p, Vec P, AppCtx *user);
+
+PetscErrorCode SetUpTGVortexBCs(BCs* U_BCs, BCs* V_BCs);
 
 #ifdef __cplusplus
 }
