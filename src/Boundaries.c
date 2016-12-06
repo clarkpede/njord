@@ -44,10 +44,6 @@ PetscReal BC_V(PetscReal x, PetscReal y) {
   return sin(x)*cos(y);
 }
 
-PetscReal BC_P(PetscReal x, PetscReal y) {
-  return -0.25*(cos(2*x)+cos(2*y));
-}
-
 PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, Vec U, AppCtx *user) {
   PetscInt i, j, mx, my, xs, ys, xm, ym;
   Vec u_local;

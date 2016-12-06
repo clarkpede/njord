@@ -309,7 +309,8 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   TS    ts_conv, ts_diff;
   SNES  snes;
   PetscReal dt, time;
-  PetscInt kMaxSteps = 1000;
+  const PetscReal kEndTime = 1.0;
+  const PetscInt kMaxSteps = 30;
   PetscInt n;
   TSType time_scheme;
   Mat Jac=NULL;
@@ -334,7 +335,9 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   time = 0.0;
   get_dt(da_vel, user->vel, &dt, user);
   TSSetInitialTimeStep(ts_conv,time,dt);
-  TSSetDuration(ts_conv,kMaxSteps,user->param->end_time);
+  // The end time and max number of time-steps can also be set on the command
+  // line using -ts_max_steps and -ts_final_time.
+  TSSetDuration(ts_conv,kMaxSteps,kEndTime);
   TSSetExactFinalTime(ts_conv, TS_EXACTFINALTIME_MATCHSTEP);
 
   // Update with user-defined options
