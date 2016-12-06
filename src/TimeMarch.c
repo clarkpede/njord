@@ -130,11 +130,6 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   PetscInt       i,j,Mx,My,xs,ys,xm,ym;
   PetscReal      hx,hy;
   PetscReal      FCu, FDu, FDv, FCv;
-  PetscReal      mN, mS, mE, mW;
-  PetscReal      uN, uS, uE, uW;
-  PetscReal      vN, vS, vE, vW;
-  PetscReal      dVdyN, dVdyS, dVdxW, dVdxE;
-  PetscReal      dUdxE, dUdxW, dUdyN, dUdyS;
   Vec            localX;
   Field          **x, **f;
   enum BoundaryType bc;
@@ -170,7 +165,6 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   // Compute function over the locally owned part of the grid
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
-
       if (i==0 || i==Mx-1) {
         f[j][i].u = 0;
       } else {
@@ -305,13 +299,13 @@ PetscErrorCode PressureCorrection(TS ts) {
  */
 #undef __FUNCT__
 #define __FUNCT__ "TimeMarch"
-PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
-  TS    ts_conv, ts_diff;
+PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   SNES  snes;
-  PetscReal dt, time;
+  PetscReal dt;
+  const PetscReal kStartTime = 0.0;
   const PetscReal kEndTime = 1.0;
   const PetscInt kMaxSteps = 30;
-  PetscInt n;
+
   TSType time_scheme;
   Mat Jac=NULL;
   Mat Jmf=NULL;
@@ -319,33 +313,32 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   //---------------------------------------------------------------------------
   // Set up timestepper
   //---------------------------------------------------------------------------
-  TSCreate(PETSC_COMM_WORLD, &ts_conv);
-  TSSetDM(ts_conv, da_vel);
-  TSSetProblemType(ts_conv,TS_NONLINEAR);
-  TSSetType(ts_conv, TSCN);
-  TSGetSNES(ts_conv,&snes);
-  TSSetSolution(ts_conv, user->vel);
+  TSCreate(PETSC_COMM_WORLD, ts);
+  TSSetDM(*ts, da_vel);
+  TSSetProblemType(*ts,TS_NONLINEAR);
+  TSSetType(*ts, TSCN);
+  TSGetSNES(*ts,&snes);
+  TSSetSolution(*ts, user->vel);
 
-  TSSetRHSFunction(ts_conv,NULL,FormTimeDerivativeFunction,user);
+  TSSetRHSFunction(*ts,NULL,FormTimeDerivativeFunction,user);
 
   // Print information about the time-stepper
-  TSMonitorSet(ts_conv,Monitor,NULL,NULL);
+  TSMonitorSet(*ts,Monitor,NULL,NULL);
 
   // Set the initial time step
-  time = 0.0;
   get_dt(da_vel, user->vel, &dt, user);
-  TSSetInitialTimeStep(ts_conv,time,dt);
+  TSSetInitialTimeStep(*ts,kStartTime,dt);
   // The end time and max number of time-steps can also be set on the command
   // line using -ts_max_steps and -ts_final_time.
-  TSSetDuration(ts_conv,kMaxSteps,kEndTime);
-  TSSetExactFinalTime(ts_conv, TS_EXACTFINALTIME_MATCHSTEP);
+  TSSetDuration(*ts,kMaxSteps,kEndTime);
+  TSSetExactFinalTime(*ts, TS_EXACTFINALTIME_MATCHSTEP);
 
   // Update with user-defined options
-  TSSetApplicationContext(ts_conv, user);
-  TSSetFromOptions(ts_conv);
+  TSSetApplicationContext(*ts, user);
+  TSSetFromOptions(*ts);
 
   // Set up the Jacobian, if an implicit method is to be used
-  TSGetType(ts_conv, &time_scheme);
+  TSGetType(*ts, &time_scheme);
   if (strcmp(time_scheme,TSCN) || strcmp(time_scheme,TSBEULER)) {
     DMCreateMatrix(da_vel,&Jac);
     MatCreateSNESMF(snes,&Jmf);
@@ -353,14 +346,14 @@ PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user) {
   }
 
   // Print the information about the time-stepper
-  if (user->param->verbose) TSView(ts_conv,PETSC_VIEWER_STDOUT_WORLD);
+  if (user->param->verbose) TSView(*ts,PETSC_VIEWER_STDOUT_WORLD);
 
   // Use a pre-step so we can update BCs and set a variable time step
   // Use the pressure correction as a post-step
-  TSSetPreStep(ts_conv, Prestep);
-  TSSetPostStep(ts_conv, PressureCorrection);
+  TSSetPreStep(*ts, Prestep);
+  TSSetPostStep(*ts, PressureCorrection);
 
-  TSSolve(ts_conv, user->vel);
+  TSSolve(*ts, user->vel);
 
   return 0;
 }

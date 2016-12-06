@@ -18,9 +18,8 @@ PetscErrorCode ReportParams(Parameters*, GridInfo*);
 #undef __FUNCT__
 #define __FUNCT__ "main"
 int main(int argc, char* argv[]) {
-  Vec   x,r;      // Solution and residual vectors
-  Mat   J;        // Jacobian matrix
   DM    da_vel, da_p;
+  TS    ts;
   AppCtx *user;      // User defined work context
   Parameters param;  // Physical and other parameters
   GridInfo grid;     // Parameters defining the grid
@@ -65,7 +64,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Advance the solution through time
-  TimeMarch(da_vel, da_p, user);
+  TimeMarch(&ts, da_vel, da_p, user);
 
   // Output to a *.vts file.
   if(param.write_output) {
@@ -155,7 +154,6 @@ PetscErrorCode ReportParams(Parameters *param, GridInfo *grid) {
                 "---------------------BEGIN NJORD PARAM REPORT-------------------\n");
     PetscPrintf(PETSC_COMM_WORLD,"Runtime parameters:\n");
     PetscPrintf(PETSC_COMM_WORLD,"    CFL:      %g\n", param->CFL);
-    PetscPrintf(PETSC_COMM_WORLD,"    End time: %g\n", param->end_time);
     if (param->write_output) {
       PetscPrintf(PETSC_COMM_WORLD,"Writing final solution to: \n");
       PetscPrintf(PETSC_COMM_WORLD,"    %s\n", param->outfile);
