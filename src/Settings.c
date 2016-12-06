@@ -8,10 +8,10 @@
 #include "Settings.h"
 
 PetscErrorCode SetGridDefaults(GridInfo *grid) {
-  grid->mx = 64;
-  grid->my = 64;
-  grid->Lx = M_PI;
-  grid->Ly = M_PI;
+  grid->mx = 240;
+  grid->my = 60;
+  grid->Lx = 36.0;
+  grid->Ly = 9.0;
   grid->stencil = DMDA_STENCIL_STAR;
   grid->bc_x = DM_BOUNDARY_GHOSTED;
   grid->bc_y = DM_BOUNDARY_GHOSTED;
