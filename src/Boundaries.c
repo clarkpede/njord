@@ -9,25 +9,25 @@
 
 PetscErrorCode GetBoundaryType(PetscInt i, PetscInt j,PetscInt mx,
                                PetscInt my, enum BoundaryType* type) {
-  if (i==-1) {
-    if (j==-1) {
+  if (i==0) {
+    if (j==0) {
       *type = BOTTOMLEFT;
-    } else if (j==my) {
+    } else if (j==my-1) {
       *type = TOPLEFT;
     } else {
       *type = LEFT;
     }
-  } else if (i==mx) {
-    if (j==-1) {
+  } else if (i==mx-1) {
+    if (j==0) {
       *type = BOTTOMRIGHT;
-    } else if (j==my) {
+    } else if (j==my-1) {
       *type = TOPRIGHT;
     } else {
       *type = RIGHT;
     }
-  } else if (j==-1) {
+  } else if (j==0) {
     *type = BOTTOM;
-  } else if (j==my) {
+  } else if (j==my-1) {
     *type = TOP;
   } else {
     *type = NONE;
