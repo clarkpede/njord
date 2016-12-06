@@ -33,6 +33,7 @@ void RunTest(PetscInt mx, PetscInt my, PetscReal* L2_err, PetscReal* Linf_err) {
   SetGridDefaults(&grid);
   grid.mx = mx; grid.my = my;
   param.nu = 1.0;
+  param.CFL = 1.0;
   grid.dx = grid.Lx/grid.mx;
   grid.dy = grid.Ly/grid.my;
 
@@ -100,7 +101,7 @@ BOOST_AUTO_TEST_CASE( Taylor_Green_Spatial_Convergence) {
   PetscPrintf(PETSC_COMM_WORLD,"Linf Convergence rates:\t%g and %g\n",
               Linf_rate_1, Linf_rate_2);
 
-  PetscReal tol = .05;
+  double tol = .05;
   BOOST_CHECK_SMALL(L2_rate_1-2.0,tol);
   BOOST_CHECK_SMALL(L2_rate_2-2.0,tol);
   BOOST_CHECK_SMALL(Linf_rate_1-2.0,tol);
