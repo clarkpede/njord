@@ -33,7 +33,7 @@ void RunTest(PetscInt mx, PetscInt my, PetscReal* L2_err, PetscReal* Linf_err) {
   SetGridDefaults(&grid);
   grid.mx = mx; grid.my = my;
   param.nu = 1.0;
-  param.CFL = 0.1;
+  param.CFL = 0.3;
   grid.dx = grid.Lx/grid.mx;
   grid.dy = grid.Ly/grid.my;
 

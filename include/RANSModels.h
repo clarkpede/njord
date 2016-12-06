@@ -8,11 +8,20 @@
 #ifndef INCLUDE_RANSMODELS_H_
 #define INCLUDE_RANSMODELS_H_
 
+#include <petscdm.h>
+#include <petscdmda.h>
+
 class SAModel {
  public:
   SAModel();
-  void set(double nu_hat, double nu, double Omega, double dist);
-  double get_nu_t(double nu_hat);
+  PetscReal get_residual(PetscScalar **u, PetscScalar **v,
+                                  PetscScalar **nu_tilda, PetscInt i, PetscInt j,
+                                  PetscReal d, PetscReal nu,
+                                  PetscReal hx, PetscReal hy);
+ private:
+  PetscReal get_S(PetscScalar **u, PetscScalar **v,
+                           PetscInt i, PetscInt j, PetscReal hx, PetscReal hy);
+  // Model coefficients
   const double cw1;
   const double cw2;
   const double cw3;
@@ -21,16 +30,10 @@ class SAModel {
   const double sigma;
   const double kappa;
   const double cv1;
-  const double cl3;
-  const double cl4;
-  double d;
-  double fv1;
-  double fv2;
-  double fw;
-  double g;
-  double r;
-  double ft2;
-  double S;
+  const double ct1;
+  const double ct2;
+  const double ct3;
+  const double ct4;
 };
 
 

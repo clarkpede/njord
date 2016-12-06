@@ -220,8 +220,6 @@ PetscErrorCode get_dt(DM da, Vec U, PetscReal* dt, AppCtx* user){
   // Set the smaller of the two as an output
   *dt = ((dt_conv < dt_diff) ? dt_conv: dt_diff);
 
-  *dt = dt_conv;
-
   return 0;
 }
 
@@ -239,14 +237,29 @@ PetscErrorCode Prestep(TS ts) {
   // Recompute the time step based on the CFL condition
   get_dt(da_vel, user->vel, &dt, user);
   TSSetTimeStep(ts, dt);
-  TSGetTimeStep(ts, &dt); // Just in case we're at the final timestep
-
-  TSGetTime(ts,&time);
-  UpdateBoundaryConditionsUV(da_vel, da_p, user->vel, user->p, time, dt, user);
 
   // Set up profiling for the time-integration:
   PetscLogEventRegister("Time Integration",0,&user->current_event);
   PetscLogEventBegin(user->current_event,0,0,0,0);
+
+  return 0;
+}
+
+PetscErrorCode Prestage(TS ts, PetscReal stagetime) {
+  PetscReal dt, time;
+  DM        da_vel, da_p;
+  AppCtx*   user;
+
+  // Unpack the application state from TS
+  TSGetApplicationContext(ts, &user);
+  TSGetDM(ts, &da_vel);
+  DMDAGetReducedDMDA(da_vel, 1, &da_p);
+  DMSetApplicationContext(da_p,user);
+
+  TSGetTimeStep(ts, &dt);
+  TSGetTime(ts,&time);
+
+  UpdateBoundaryConditionsUV(da_vel, da_p, user->vel, user->p, time, dt, user);
 
   return 0;
 }
@@ -320,7 +333,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSCreate(PETSC_COMM_WORLD, ts);
   TSSetDM(*ts, da_vel);
   TSSetProblemType(*ts,TS_NONLINEAR);
-  TSSetType(*ts, TSCN);
+  TSSetType(*ts, TSEULER);
   TSGetSNES(*ts,&snes);
   TSSetSolution(*ts, user->vel);
 
@@ -355,6 +368,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   // Use a pre-step so we can update BCs and set a variable time step
   // Use the pressure correction as a post-step
   TSSetPreStep(*ts, Prestep);
+  TSSetPreStage(*ts,Prestage);
   TSSetPostStep(*ts, PressureCorrection);
 
   TSSolve(*ts, user->vel);
