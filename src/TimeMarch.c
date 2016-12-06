@@ -239,10 +239,10 @@ PetscErrorCode Prestep(TS ts) {
   // Recompute the time step based on the CFL condition
   get_dt(da_vel, user->vel, &dt, user);
   TSSetTimeStep(ts, dt);
+  TSGetTimeStep(ts, &dt); // Just in case we're at the final timestep
 
   TSGetTime(ts,&time);
-
-  UpdateBoundaryConditionsUV(da_vel, user->vel, time, user);
+  UpdateBoundaryConditionsUV(da_vel, da_p, user->vel, user->p, time, dt, user);
 
   // Set up profiling for the time-integration:
   PetscLogEventRegister("Time Integration",0,&user->current_event);
@@ -320,7 +320,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSCreate(PETSC_COMM_WORLD, ts);
   TSSetDM(*ts, da_vel);
   TSSetProblemType(*ts,TS_NONLINEAR);
-  TSSetType(*ts, TSBEULER);
+  TSSetType(*ts, TSCN);
   TSGetSNES(*ts,&snes);
   TSSetSolution(*ts, user->vel);
 
