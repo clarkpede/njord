@@ -13,7 +13,6 @@
 // All of the user-specified parameters that change execution
 typedef struct {
   PetscReal nu;                        // Kinematic viscosity
-  PetscReal end_time;                  // Duration of simulation
   PetscReal CFL;                       // CFL number
   PetscBool verbose;                   // If true, print a full runtime summary
   PetscBool write_output;              // If true, output solution to *.vts

@@ -13,8 +13,8 @@
 #include "Settings.h"
 #include "Verification.h"
 
-struct F{
-  F() {
+struct poisson_fixture{
+  poisson_fixture() {
     //--------------------------
     // Setup
     //--------------------------
@@ -46,7 +46,7 @@ struct F{
   //--------------------------
   // Teardown
   //--------------------------
-  ~F() {
+  ~poisson_fixture() {
     VecDestroy(&user->vel);
     VecDestroy(&user->p);
     PetscFree(user);
@@ -67,11 +67,11 @@ PetscReal test_rhs_func(PetscReal x, PetscReal y) {
   return std::cos(x) + std::cos(y);
 };
 
-PetscReal exact_solution(PetscReal x, PetscReal y) {
+PetscReal exact_solution(PetscReal x, PetscReal y, PetscReal t) {
   return -std::cos(x) - std::cos(y);
 };
 
-BOOST_FIXTURE_TEST_SUITE(Poisson, F)
+BOOST_FIXTURE_TEST_SUITE(Poisson, poisson_fixture)
 
 BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Constant_Is_Zero ) {
 
@@ -89,9 +89,11 @@ BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Constant_Is_Zero ) {
 }
 
 BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Trig_Is_Close ) {
+  PetscReal arbitrary_time = 0.0;
+
   Vec exact;
   VecDuplicate(user->p, &exact);
-  SetUpExactSolutionP(da_p, exact, &exact_solution, user);
+  SetUpExactSolutionP(da_p, exact, arbitrary_time, &exact_solution, user);
 
   PetscReal arbitrary_dt = 1.0;
   SolvePoisson(da_vel, da_p, arbitrary_dt, user, &test_rhs_func);

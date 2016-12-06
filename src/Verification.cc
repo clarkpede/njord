@@ -7,9 +7,9 @@
 
 #include "Verification.h"
 
-PetscErrorCode SetUpExactSolutionUV(DM da, Vec U,
-                                  PetscReal (*exact_u)(PetscReal, PetscReal),
-                                  PetscReal (*exact_v)(PetscReal, PetscReal),
+PetscErrorCode SetUpExactSolutionUV(DM da, Vec U, PetscReal time,
+                                  PetscReal (*exact_u)(PetscReal, PetscReal, PetscReal),
+                                  PetscReal (*exact_v)(PetscReal, PetscReal, PetscReal),
                                   AppCtx *user) {
   PetscInt i, j, mx, my, xs, ys, xm, ym;
   Field **field;
@@ -25,7 +25,7 @@ PetscErrorCode SetUpExactSolutionUV(DM da, Vec U,
     y = (j+.5)*hy;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx;
-      field[j][i].u = (*exact_u)(x,y);
+      field[j][i].u = (*exact_u)(x,y,time);
     }
   }
 
@@ -33,7 +33,7 @@ PetscErrorCode SetUpExactSolutionUV(DM da, Vec U,
     y = j*hy;
     for (i=xs; i<xs+xm; i++) {
       x = (i+.5)*hx;
-      field[j][i].v = (*exact_v)(x,y);
+      field[j][i].v = (*exact_v)(x,y,time);
     }
   }
 
@@ -42,8 +42,8 @@ PetscErrorCode SetUpExactSolutionUV(DM da, Vec U,
 };
 
 
-PetscErrorCode SetUpExactSolutionP(DM da, Vec P,
-                                  PetscReal (*exact_p)(PetscReal, PetscReal),
+PetscErrorCode SetUpExactSolutionP(DM da, Vec P, PetscReal time,
+                                  PetscReal (*exact_p)(PetscReal, PetscReal, PetscReal),
                                   AppCtx *user) {
   PetscInt i, j, mx, my, xs, ys, xm, ym;
   PetscReal **p;
@@ -59,7 +59,7 @@ PetscErrorCode SetUpExactSolutionP(DM da, Vec P,
     y = (j+.5)*hy;
     for (i=xs; i<xs+xm; i++) {
       x = (i+.5)*hx;
-      p[j][i]  = (*exact_p)(x,y);
+      p[j][i]  = (*exact_p)(x,y,time);
     }
   }
 

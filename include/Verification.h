@@ -32,9 +32,9 @@ extern "C" {
  * @param U - A global vector for the exact u and v velocities.
  * @return Returns 0 if the function finishes execution
  */
-PetscErrorCode SetUpExactSolutionUV(DM da, Vec U,
-                                  PetscReal (*exact_u)(PetscReal, PetscReal),
-                                  PetscReal (*exact_v)(PetscReal, PetscReal),
+PetscErrorCode SetUpExactSolutionUV(DM da, Vec U, PetscReal time,
+                                  PetscReal (*exact_u)(PetscReal, PetscReal, PetscReal),
+                                  PetscReal (*exact_v)(PetscReal, PetscReal, PetscReal),
                                   AppCtx *user);
 
 /** Sets up a vector containing the exact pressure data.
@@ -51,8 +51,8 @@ PetscErrorCode SetUpExactSolutionUV(DM da, Vec U,
  * @param P - A global vector for the exact pressure data.
  * @return Returns 0 if the function finishes execution
  */
-PetscErrorCode SetUpExactSolutionP(DM da, Vec P,
-                                  PetscReal (*exact_p)(PetscReal, PetscReal),
+PetscErrorCode SetUpExactSolutionP(DM da, Vec P, PetscReal time,
+                                  PetscReal (*exact_p)(PetscReal, PetscReal, PetscReal),
                                   AppCtx *user);
 
 /** Computes the given error norm of the data.

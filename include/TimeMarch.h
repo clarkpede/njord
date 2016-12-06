@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-PetscErrorCode TimeMarch(DM da_vel, DM da_p, AppCtx *user);
+PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user);
 
 #ifdef __cplusplus
 }

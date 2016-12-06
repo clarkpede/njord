@@ -1,0 +1,94 @@
+#include <boost/test/unit_test.hpp>
+#include <petscsys.h>
+
+#include <petscdm.h>
+#include <petscdmda.h>
+
+#include <cmath>
+
+#include "Settings.h"
+#include "InitialSolution.h"
+#include "TimeMarch.h"
+#include "Verification.h"
+
+BOOST_AUTO_TEST_SUITE(Taylor_Green_Error_Regression)
+
+PetscReal exact_u(PetscReal x, PetscReal y, PetscReal t) {
+  return -std::cos(x)*std::sin(y)*std::exp(-2*t);
+}
+
+PetscReal exact_v(PetscReal x, PetscReal y, PetscReal t) {
+  return std::sin(x)*std::cos(y)*std::exp(-2*t);
+}
+
+void RunTest(PetscInt mx, PetscInt my, PetscReal* Linf_err) {
+  DM    da_vel, da_p;
+  TS    ts;
+  AppCtx *user;      // User defined work context
+  Parameters param;  // Physical and other parameters
+  GridInfo grid;     // Parameters defining the grid
+
+  // Set up the problem parameters
+  SetParamDefaults(&param);
+  SetGridDefaults(&grid);
+  grid.mx = mx; grid.my = my;
+  param.nu = 1.0;
+  grid.dx = grid.Lx/grid.mx;
+  grid.dy = grid.Ly/grid.my;
+
+  // Create user context and setup initial conditions
+  PetscNew(&user);
+  user->param = &param;
+  user->grid =  &grid;
+
+  // Create a distributed array for the velocities
+  DMDACreate2d(PETSC_COMM_WORLD, grid.bc_x, grid.bc_y, grid.stencil,
+               grid.mx, grid.my, PETSC_DECIDE, PETSC_DECIDE,
+               grid.dof, grid.stencil_width, 0,0,&da_vel);
+  DMSetApplicationContext(da_vel,user);
+  DMDASetFieldName(da_vel,0,"x mean velocity");
+  DMDASetFieldName(da_vel,1,"y mean velocity");
+  DMCreateGlobalVector(da_vel,&(user->vel));
+
+  // Create a distributed array for the pressure
+  DMDAGetReducedDMDA(da_vel, 1, &da_p);
+  DMSetApplicationContext(da_p,user);
+  DMCreateGlobalVector(da_p,&(user->p));
+
+  // Create the initial field
+  SetInitialVelocities(da_vel, user->vel, user);
+  SetInitialPressure(da_p, user->p, user);
+
+  // Advance the solution through time
+  // NOTE: The number of steps is fixed at 30 here, to match Kim & Moin's paper
+  PetscOptionsSetValue(NULL,"-ts_final_time","10000");
+  PetscOptionsSetValue(NULL,"-ts_max_steps","10");
+  TimeMarch(&ts, da_vel, da_p, user);
+
+  // Compute the Linf error
+  Vec exact;
+  PetscReal time;
+  TSGetTime(ts,&time);
+  VecDuplicate(user->vel, &exact);
+  SetUpExactSolutionUV(da_vel, exact, time, &exact_u, &exact_v, user);
+  GetErrorNorm(exact, user->vel, NORM_INFINITY, Linf_err);
+  PetscPrintf(PETSC_COMM_WORLD,"Linf Error:\t%g\n",*Linf_err);
+
+  // Cleanup
+  VecDestroy(&user->vel);
+  VecDestroy(&user->p);
+  PetscFree(user);
+  DMDestroy(&da_vel);
+  DMDestroy(&da_p);
+}
+
+BOOST_AUTO_TEST_CASE( Taylor_Green_Spatial_Convergence) {
+  PetscReal err[2];
+
+  RunTest(20,20,&err[0]);
+  RunTest(40,40,&err[1]);
+
+  BOOST_CHECK(err[1] < err[0]);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
