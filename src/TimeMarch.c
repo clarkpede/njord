@@ -320,7 +320,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSCreate(PETSC_COMM_WORLD, ts);
   TSSetDM(*ts, da_vel);
   TSSetProblemType(*ts,TS_NONLINEAR);
-  TSSetType(*ts, TSCN);
+  TSSetType(*ts, TSBEULER);
   TSGetSNES(*ts,&snes);
   TSSetSolution(*ts, user->vel);
 

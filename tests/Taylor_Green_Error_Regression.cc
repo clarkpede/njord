@@ -63,7 +63,7 @@ void RunTest(PetscInt mx, PetscInt my, PetscReal* L2_err, PetscReal* Linf_err) {
   // Advance the solution through time
   // NOTE: The number of steps is fixed at 30 here, to match Kim & Moin's paper
   PetscOptionsSetValue(NULL,"-ts_final_time","10000");
-  PetscOptionsSetValue(NULL,"-ts_max_steps","10");
+  PetscOptionsSetValue(NULL,"-ts_max_steps","30");
   TimeMarch(&ts, da_vel, da_p, user);
 
   // Compute the Linf error
