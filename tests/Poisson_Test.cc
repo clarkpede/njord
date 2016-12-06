@@ -11,6 +11,7 @@
 #include "Poisson.h"
 #include "Boundaries.h"
 #include "Settings.h"
+#include "Verification.h"
 
 struct F{
   F() {
@@ -66,35 +67,16 @@ PetscReal test_rhs_func(PetscReal x, PetscReal y) {
   return std::cos(x) + std::cos(y);
 };
 
-PetscErrorCode SetUpExactSolution(DM da, Vec U, AppCtx *user) {
-  PetscInt i, j, mx, my, xs, ys, xm, ym;
-  PetscScalar **p;
-  PetscReal hx, hy, x, y;
-
-  hx = user->grid->dx;
-  hy = user->grid->dy;
-
-  DMDAGetCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
-  DMDAVecGetArray(da,U,&p);
-
-  for (j=ys; j<ys+ym; j++) {
-    y = (j+.5)*hy;
-    for (i=xs; i<xs+xm; i++) {
-      x = (i+.5)*hx;
-      p[j][i]  = -test_rhs_func(x,y);
-    }
-  }
-
-  DMDAVecRestoreArray(da,U,&p);
-  return 0;
+PetscReal exact_solution(PetscReal x, PetscReal y) {
+  return -std::cos(x) - std::cos(y);
 };
 
 BOOST_FIXTURE_TEST_SUITE(Poisson, F)
 
 BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Constant_Is_Zero ) {
 
-  VecSet(user->vel,1.0);
-  UpdateBoundaryConditionsUV(da_vel, user->vel, user);
+  VecSet(user->vel,0.0);
+  // Ghost cells are automatically zero, so we don't need to update BCs
 
   PetscReal arbitrary_dt = 1.0;
   SolvePoisson(da_vel, da_p, arbitrary_dt, user, NULL);
@@ -109,32 +91,16 @@ BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Constant_Is_Zero ) {
 BOOST_AUTO_TEST_CASE( Poisson_Solution_of_Trig_Is_Close ) {
   Vec exact;
   VecDuplicate(user->p, &exact);
-  SetUpExactSolution(da_p, exact, user);
-
-  //XXX: Print to file
-  PetscViewer viewer;
-  PetscViewerVTKOpen(PETSC_COMM_WORLD,"output/p_exact.vts",
-                     FILE_MODE_WRITE,&viewer);
-  VecView(exact,viewer);
-  PetscViewerDestroy(&viewer);
+  SetUpExactSolutionP(da_p, exact, &exact_solution, user);
 
   PetscReal arbitrary_dt = 1.0;
   SolvePoisson(da_vel, da_p, arbitrary_dt, user, &test_rhs_func);
 
-  PetscScalar tol = 1e-3;
-  PetscScalar norm;
-  PetscInt size;
+  PetscReal err;
+  GetErrorNorm(exact, user->p, NORM_2, &err);
 
-  //XXX: Print to file
-  PetscViewerVTKOpen(PETSC_COMM_WORLD,"output/p.vts",
-                     FILE_MODE_WRITE,&viewer);
-  VecView(user->p,viewer);
-  PetscViewerDestroy(&viewer);
-
-  VecAXPY(user->p,-1.0,exact);
-  VecNorm(user->p, NORM_2, &norm);
-  VecGetSize(user->p, &size);
-  BOOST_CHECK_SMALL(norm/size, tol);
+  PetscScalar tol = 1e-5;
+  BOOST_CHECK_SMALL(err, tol);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

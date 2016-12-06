@@ -103,8 +103,6 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
   PetscOptionsBegin(PETSC_COMM_WORLD,"","User-specified runtime options",
                     __FILE__);{
     SetParamDefaults(param);
-    PetscOptionsReal("-T","Duration of the simulation","none",param->end_time,
-                     &(param->end_time),NULL);
     PetscOptionsReal("-CFL","CFL number used for time advancement","none",
                      param->CFL,&(param->CFL),NULL);
     PetscOptionsString("-o","Output solution to a specified *.vts file",
