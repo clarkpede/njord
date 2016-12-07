@@ -74,6 +74,18 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
  */
 PetscErrorCode UpdateBoundaryConditionsP(DM da_p, Vec P, AppCtx *user);
 
+/** Updates the last column of cells so that mass conservation is satisfied.
+ *
+ * --Inputs--
+ * @param da_vel - The DM object used for the u and v velocities
+ * @param U - The global vector representing u and v velocities
+ * @param user - The user specified context
+ *
+ * --Outputs--
+ * @return Returns 0 if the function finishes execution.
+ */
+PetscErrorCode CorrectMassFluxAtOutlet(DM da_vel, Vec U, AppCtx *user);
+
 #ifdef __cplusplus
 }
 #endif

@@ -101,9 +101,8 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
         x = i*hx; y = my*hy;
         field[j][i].u = 2*(-dt*dpdx) - field[j-1][i].u;
       } else if (bc==RIGHT) {
-        // Used for pressure-poisson RHS calc
-        x = mx*hx; y = (j+0.5)*hy;
-        field[j][i].u = BC_U(x,y,time,user->param->nu) - dt*dpdx;
+        // Convection outflow
+        field[j][i].u = field[j][i-1].u;
       }
     }
   }
@@ -127,14 +126,13 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
       if (bc==TOP) {
         // Used for pressure-poisson RHS calc
         y = my*hy; x = (i+0.5)*hx;
-        field[j][i].v = (- dt*dpdy);
+        field[j][i].v = (-dt*dpdy);
       } else if (bc==LEFT) {
         x = 0; y = j*hy;
-        field[j][i].v = 2*(BC_V(x,y,time,user->param->nu) - dt*dpdy)
-                - field[j][i+1].v;
+        field[j][i].v = 2*(-dt*dpdy) - field[j][i+1].v;
       } else if (bc==RIGHT) {
-        x = my*hy; y = j*hy;
-        field[j][i].v = 2*(BC_V(x,y,time,user->param->nu) - dt*dpdy) - field[j][i-1].v;
+        // Convection outflow
+        field[j][i].v = field[j][i-1].v;
       }
     }
   }
@@ -192,5 +190,42 @@ PetscErrorCode UpdateBoundaryConditionsP(DM da_p, Vec P, AppCtx *user) {
   DMLocalToGlobalBegin(da_p, p_local, INSERT_VALUES, P);
   DMLocalToGlobalEnd  (da_p, p_local, INSERT_VALUES, P);
   DMRestoreLocalVector(da_p, &p_local);
+  return 0;
+}
+
+PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
+  PetscReal total_flux_in = 0;
+  PetscReal local_flux_out = 0;
+  PetscReal global_flux_out = 0;
+  PetscInt mx, my;
+  PetscInt i,j,xs,ys,xm,ym;
+  Field** field;
+
+  // Get the domain size
+  DMDAGetInfo(da, PETSC_IGNORE, &mx, &my, PETSC_IGNORE, PETSC_IGNORE,
+              PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE,
+              PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE);
+
+  // Calculate the total flux into the domain
+  for (j=0; j<my; j++) {
+    total_flux_in += user->inlet_profile[j];
+  }
+
+  DMDAGetCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
+  DMDAVecGetArray(da,U,&field);
+
+  for (j=0; j<my; j++) {
+    local_flux_out += field[j][mx-1].u;
+  }
+
+  MPI_Allreduce(&local_flux_out, &global_flux_out, 1, MPI_DOUBLE, MPI_SUM,
+                PETSC_COMM_WORLD);
+
+  for (j=0; j<my; j++) {
+    field[j][mx-1].u *= total_flux_in/global_flux_out;
+  }
+
+  DMDAVecRestoreArray(da,U,&field);
+
   return 0;
 }

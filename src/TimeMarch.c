@@ -165,7 +165,8 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   // Compute function over the locally owned part of the grid
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
-      if (i==0 || i==Mx-1) {
+      if (i==0 ) {
+        // No need to update Dirichlet BC on inlet
         f[j][i].u = 0;
       } else {
         FCu =  get_FCu(x,hx,hy,i,j);
@@ -281,6 +282,9 @@ PetscErrorCode PressureCorrection(TS ts) {
   DMDAGetReducedDMDA(da_vel, 1, &da_p);
   DMSetApplicationContext(da_p,user);
 
+  // Update the convective outflow BC so the domain is mass-conserving
+  CorrectMassFluxAtOutlet(da_vel, user->vel, user);
+
   // Solves the Poisson equation and stores the result in user->p
   SolvePoisson(da_vel, da_p, dt, user, NULL);
   // Pressure ghost cells need to be updated to get grad(p) at left/bottom
@@ -301,8 +305,8 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   SNES  snes;
   PetscReal dt;
   const PetscReal kStartTime = 0.0;
-  const PetscReal kEndTime = 1.0;
-  const PetscInt kMaxSteps = 30;
+  const PetscReal kEndTime = 40.0;
+  const PetscInt kMaxSteps = 800;
 
   TSType time_scheme;
   Mat Jac=NULL;
@@ -314,7 +318,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSCreate(PETSC_COMM_WORLD, ts);
   TSSetDM(*ts, da_vel);
   TSSetProblemType(*ts,TS_NONLINEAR);
-  TSSetType(*ts, TSEULER);
+  TSSetType(*ts, TSRK);
   TSGetSNES(*ts,&snes);
   TSSetSolution(*ts, user->vel);
 

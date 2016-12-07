@@ -53,7 +53,7 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   // Use the Jacobian preconditioner and the BiCGSTAB solver
   PC pc;
   KSPGetPC(ksp, &pc);
-  PCSetType(pc, PCGAMG);
+  PCSetType(pc, PCMG);
   KSPSetType(ksp, KSPBCGS);
 
   // Finish setting up ksp
