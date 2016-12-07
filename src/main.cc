@@ -113,6 +113,8 @@ PetscErrorCode SetParams(Parameters *param, GridInfo *grid) {
     PetscOptionsString("-o","Output solution to a specified *.vts file",
                        "none",param->outfile,param->outfile, PETSC_MAX_PATH_LEN,
                        &param->write_output);
+    PetscOptionsName("-output_all","Output a *.vts file for each time step.",
+                     "none",&(param->write_each_step));
     PetscOptionsName("-verbose","Print all info during execution.","none",
                      &(param->verbose));
   }
@@ -163,7 +165,10 @@ PetscErrorCode ReportParams(Parameters *param, GridInfo *grid) {
     if (param->write_output) {
       PetscPrintf(PETSC_COMM_WORLD,"Writing final solution to: \n");
       PetscPrintf(PETSC_COMM_WORLD,"    %s\n", param->outfile);
-    };
+    }
+    if (param->write_each_step) {
+      PetscPrintf(PETSC_COMM_WORLD,"Set to output a *.vts file each time step.\n");
+    }
     PetscPrintf(PETSC_COMM_WORLD,"Grid: \n");
     PetscPrintf(PETSC_COMM_WORLD,"    [mx,my]: %D, %D \n", grid->mx, grid->my);
     PetscPrintf(PETSC_COMM_WORLD,"    [Lx,Ly]: %g, %g \n", grid->Lx, grid->Ly);

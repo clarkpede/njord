@@ -34,7 +34,7 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
     y = j*hy + hy/2.0;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx;
-      u[j][i].u  = -cos(x)*sin(y);
+      u[j][i].u  = user->inlet_profile[j];
     }
   }
 
@@ -43,7 +43,7 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
     y = j*hy;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx + hx/2.0;
-      u[j][i].v  = sin(x)*cos(y);
+      u[j][i].v  = 0.0;
     }
   }
 

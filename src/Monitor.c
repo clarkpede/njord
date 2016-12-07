@@ -28,10 +28,10 @@
             solution.
 */
 PetscErrorCode Monitor(TS ts,PetscInt step,PetscReal time,Vec u, void *ctx) {
-  AppCtx         *appctx = (AppCtx*)ctx;   /* user-defined application context */
+  AppCtx*        user = (AppCtx*)ctx;   /* user-defined application context */
   PetscReal      dt;
   PetscReal      maxim, mean;
-  PetscInt       size;
+  PetscInt       timestep_number, size;
 
   // Compute field statistics:
   VecGetSize(u, &size);
@@ -39,12 +39,32 @@ PetscErrorCode Monitor(TS ts,PetscInt step,PetscReal time,Vec u, void *ctx) {
   VecSum(u, &mean);
   mean /= size;
   TSGetTimeStep(ts,&dt);
+  TSGetTimeStepNumber(ts,&timestep_number);
 
   // Abort if the solution is diverging
   if (maxim > 1e4 || maxim < -1e4) {
     PetscAbortErrorHandler(PETSC_COMM_WORLD, __LINE__ ,  __FUNCT__ , __FILE__ ,
                            PETSC_ERR_NOT_CONVERGED, 404,
                            "Solution is diverging over time.", NULL);
+  }
+
+  // Output to a *.vts file.
+  if(user->param->write_each_step) {
+    char filename[128];
+    char* name = "output/solution";
+    char num[5];
+    char* ext  = ".vts";
+
+    // Build the filename
+    sprintf(num, "%1d", timestep_number);
+    strncpy(filename, name, sizeof(filename));
+    strncat(filename, num, (sizeof(filename) - strlen(filename)));
+    strncat(filename, ext, (sizeof(filename) - strlen(filename)));
+
+    PetscViewer viewer;
+    PetscViewerVTKOpen(PETSC_COMM_WORLD,filename,FILE_MODE_WRITE,&viewer);
+    VecView(u,viewer);
+    PetscViewerDestroy(&viewer);
   }
 
   PetscPrintf(PETSC_COMM_WORLD,"step #: %D,\t step size = %g,\t time = %g,\t max = %g,\t mean = %g\n",step,(double)dt,(double)time, maxim, mean);

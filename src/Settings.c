@@ -25,6 +25,7 @@ PetscErrorCode SetParamDefaults(Parameters *param) {
   param->CFL = 0.6;
   param->verbose = PETSC_FALSE;
   param->write_output = PETSC_FALSE;
+  param->write_each_step = PETSC_FALSE;
   strcpy(param->outfile,"output/average_fields.vts");
   return 0;
 }

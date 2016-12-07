@@ -16,6 +16,7 @@ typedef struct {
   PetscReal CFL;                       // CFL number
   PetscBool verbose;                   // If true, print a full runtime summary
   PetscBool write_output;              // If true, output solution to *.vts
+  PetscBool write_each_step;           // If true, output a solution each step
   char    outfile[PETSC_MAX_PATH_LEN]; // The name of the *.vts file to be used
 } Parameters;
 

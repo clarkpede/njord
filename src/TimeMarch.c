@@ -287,25 +287,6 @@ PetscErrorCode PressureCorrection(TS ts) {
   UpdateBoundaryConditionsP(da_p, user->p, user);
   CorrectVelocities(da_vel, da_p, dt, user);
 
-  // Output to a *.vts file.
-  if(user->param->write_output) {
-    char filename[128];
-    char* name = "output/solution";
-    char num[5];
-    char* ext  = ".vts";
-
-    // Build the filename
-    sprintf(num, "%1d", timestep_number);
-    strncpy(filename, name, sizeof(filename));
-    strncat(filename, num, (sizeof(filename) - strlen(filename)));
-    strncat(filename, ext, (sizeof(filename) - strlen(filename)));
-
-    PetscViewer viewer;
-    PetscViewerVTKOpen(PETSC_COMM_WORLD,filename,FILE_MODE_WRITE,&viewer);
-    VecView(user->vel,viewer);
-    PetscViewerDestroy(&viewer);
-  }
-
   return 0;
 
 };
@@ -340,7 +321,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSSetRHSFunction(*ts,NULL,FormTimeDerivativeFunction,user);
 
   // Print information about the time-stepper
-  TSMonitorSet(*ts,Monitor,NULL,NULL);
+  TSMonitorSet(*ts,Monitor,user,NULL);
 
   // Set the initial time step
   get_dt(da_vel, user->vel, &dt, user);
