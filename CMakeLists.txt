@@ -6,6 +6,8 @@ cmake_minimum_required(VERSION 2.6)
 
 project(NJORD C CXX)
 
+set(CMAKE_CXX_STANDARD 11)
+
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/" ${CMAKE_MODULE_PATH}})
 
 # PETSc dependencies
@@ -45,6 +47,11 @@ endforeach(testSrc)
 
 # Build and link
 add_executable(njord ${MAIN} ${SOURCES} ${HEADERS})
+
+# Require some C++11 specific functions
+set_property(TARGET njord PROPERTY CXX_STANDARD 11)
+set_property(TARGET njord PROPERTY CXX_STANDARD_REQUIRED ON)
+
 target_link_libraries(njord ${PETSC_LIBRARIES})
 
 

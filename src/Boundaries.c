@@ -96,12 +96,10 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
 
       if (bc==BOTTOM) {
         x = i*hx; y = 0;
-        field[j][i].u = 2*(BC_U(x,y,time,user->param->nu) - dt*dpdx)
-                    - field[j+1][i].u;
+        field[j][i].u = 2*(-dt*dpdx) - field[j+1][i].u;
       } else if (bc==TOP) {
         x = i*hx; y = my*hy;
-        field[j][i].u = 2*(BC_U(x,y,time,user->param->nu) - dt*dpdx)
-                    - field[j-1][i].u;
+        field[j][i].u = 2*(-dt*dpdx) - field[j-1][i].u;
       } else if (bc==RIGHT) {
         // Used for pressure-poisson RHS calc
         x = mx*hx; y = (j+0.5)*hy;
@@ -129,7 +127,7 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
       if (bc==TOP) {
         // Used for pressure-poisson RHS calc
         y = my*hy; x = (i+0.5)*hx;
-        field[j][i].v = (BC_V(x,y,time,user->param->nu) - dt*dpdy);
+        field[j][i].v = (- dt*dpdy);
       } else if (bc==LEFT) {
         x = 0; y = j*hy;
         field[j][i].v = 2*(BC_V(x,y,time,user->param->nu) - dt*dpdy)

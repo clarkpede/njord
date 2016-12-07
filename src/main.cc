@@ -7,6 +7,7 @@
 #include "Settings.h"
 #include "InitialSolution.h"
 #include "TimeMarch.h"
+#include "InterpolateInlet.h"
 #include "RANSModels.h"
 
 static char help[] = "Solves 2D incompressible RANS equations using SA model.\n\n";
@@ -35,6 +36,10 @@ int main(int argc, char* argv[]) {
   PetscNew(&user);
   user->param = &param;
   user->grid =  &grid;
+
+  // Set up the inlet profile
+  PetscMalloc1(user->grid->my, &user->inlet_profile);
+  GetInflowU(user->grid->dy, user->grid->my, user->inlet_profile);
 
   // Create a distributed array for the velocities
   DMDACreate2d(PETSC_COMM_WORLD, grid.bc_x, grid.bc_y, grid.stencil,
@@ -77,6 +82,7 @@ int main(int argc, char* argv[]) {
   // Cleanup
   VecDestroy(&user->vel);
   VecDestroy(&user->p);
+  PetscFree(user->inlet_profile);
   PetscFree(user);
   DMDestroy(&da_vel);
   DMDestroy(&da_p);

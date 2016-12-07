@@ -32,9 +32,10 @@ typedef struct {
 
 // The application context
 typedef struct {
-  Parameters  *param;    // Runtime parameters
-  GridInfo    *grid;     // Grid information
-  Vec         vel, p; // Vectors representing the solution at each time step
+  Parameters*   param;    // Runtime parameters
+  GridInfo*     grid;     // Grid information
+  Vec           vel, p; // Vectors representing the solution at each time step
+  PetscReal*    inlet_profile;
   PetscLogEvent current_event;
 } AppCtx;
 
