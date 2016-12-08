@@ -43,10 +43,14 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
       dpdy = (p[j][i]-p[j-1][i])/hy;
       if (i != 0) { // Don't correct Dirichlet BC at inlet
         vel[j][i].u -= dt*dpdx;
+      } else {
+        vel[j][i].u = user->inlet_profile[j];
       }
       if (j != 0) { // Don't correct bottom wall
           vel[j][i].v -= dt*dpdy;
-      };
+      } else {
+        vel[j][i].v = 0;
+      }
       // Top wall is not represented by our truncated grid
     }
   }

@@ -17,6 +17,8 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
   PetscInt i, j, mx, my, xs, ys, xm, ym;
   Field **u;
   PetscReal hx, hy, x, y;
+  PetscReal blending;
+  PetscReal outlet_profile;
 
   DMDAGetInfo(da, PETSC_IGNORE, &mx, &my, PETSC_IGNORE, PETSC_IGNORE,
               PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE,
@@ -34,7 +36,10 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
     y = j*hy + hy/2.0;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx;
-      u[j][i].u  = user->inlet_profile[j];
+      blending = pow((1.0-x/user->grid->Lx),5.0);
+      outlet_profile = -0.5*(y-1)*(y-1) + 0.5;
+      u[j][i].u  = blending*user->inlet_profile[j]
+                   + (1.0-blending)*outlet_profile;
     }
   }
 

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import matplotlib as mpl
 import numpy as np
 from vtk import *
 from vtk.util.numpy_support import vtk_to_numpy
@@ -17,36 +18,44 @@ class MidpointNormalize(colors.Normalize):
 
 # load input data
 reader = vtk.vtkXMLStructuredGridReader()
-reader.SetFileName("output/solution82.vts")
+reader.SetFileName("output/solution30.vts")
 reader.Update()
 
 # Grab the scalar data
-u_vtk = reader.GetOutput().GetPointData().GetArray("x mean velocity")
-v_vtk = reader.GetOutput().GetPointData().GetArray("y mean velocity")
+data = reader.GetOutput()
+dim = data.GetDimensions()
+mx = dim[0]
+my = dim[1]
 
 # Transform into numpy arrays
-u = vtk_to_numpy(u_vtk)
-v = vtk_to_numpy(v_vtk)
-print("Size: "+str(u.shape[0]));
-my = 100;
-mx = 100;
-u = np.reshape(u,[my,mx])
-v = np.reshape(v,[my,mx])
+u = vtk_to_numpy(data.GetPointData().GetArray('x mean velocity'))
+v = vtk_to_numpy(data.GetPointData().GetArray('y mean velocity'))
+u = np.reshape(u,[mx,my],order='F')
+v = np.reshape(v,[mx,my],order='F')
 
 speed = np.sqrt(u*u + v*v)
 
 x = np.linspace(0,30.0,mx)
 y = np.linspace(0,2.0,my)
-X, Y = np.meshgrid(x,y)
+Y, X = np.meshgrid(y,x)
 
 # Plot the data
-fig, ax = plt.subplots()
-cf = ax.pcolormesh(X,Y,u, norm=MidpointNormalize(midpoint=0.),
-                   cmap='RdBu_r')
-strm = ax.streamplot(X,Y,u,v, color='k') #color = speed, cmap=plt.cm.autumn)
-ax.set_xlim([np.min(x),np.max(x)])
-ax.set_ylim([np.min(y),np.max(y)])
-fig.set_size_inches(18,6,forward=True)
+fig, ax = plt.subplots(2,1)
+pcm1 = ax[0].pcolormesh(X,Y,u, norm=MidpointNormalize(midpoint=0.),
+                       cmap='RdBu_r')
+#strm = ax.streamplot(X,Y,u,v, color='k') #color = speed, cmap=plt.cm.autumn)
+cbar1 = fig.colorbar(pcm1, ax = ax[0], orientation='vertical')
+ax[0].set_xlim([np.min(x),np.max(x)])
+ax[0].set_ylim([np.min(y),np.max(y)])
 
+
+pcm2 = ax[1].pcolormesh(X,Y,v, norm=MidpointNormalize(midpoint=0.),
+                       cmap='RdBu_r')
+#strm = ax.streamplot(X,Y,u,v, color='k') #color = speed, cmap=plt.cm.autumn)
+cbar2 = fig.colorbar(pcm2,ax = ax[1], orientation='vertical')
+ax[1].set_xlim([np.min(x),np.max(x)])
+ax[1].set_ylim([np.min(y),np.max(y)])
+
+fig.set_size_inches(18,6,forward=True)
 plt.show()
 
