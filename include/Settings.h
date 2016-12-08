@@ -37,6 +37,7 @@ typedef struct {
   GridInfo*     grid;     // Grid information
   Vec           vel, p; // Vectors representing the solution at each time step
   PetscReal*    inlet_profile;
+  PetscReal     total_flux_in;
   PetscLogEvent current_event;
 } AppCtx;
 

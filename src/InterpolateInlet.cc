@@ -9,7 +9,8 @@
 
 #include "spline.h"
 
-PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U) {
+PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U,
+                          PetscReal *sum) {
   // Hardcoded values from Driver and Seegmiller
   std::vector<double> y_data {1.00, 1.10, 1.15, 1.20, 1.30,
                               1.40, 1.50, 1.70, 2.00, 2.40,
@@ -25,12 +26,14 @@ PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U) {
 
   // Build an interpolated array
   PetscReal y;
+  *sum = 0;
   for (PetscInt i=0; i<my; i++) {
     y = (i+0.5)*hy;
     if (y<1) {
       U[i] = 0.0;
     } else {
       U[i] = -4.0*(y-1.5)*(y-1.5) + 1;
+      *sum += U[i];
       //U[i] = interpolant(y);
     }
   };

@@ -194,18 +194,12 @@ PetscErrorCode UpdateBoundaryConditionsP(DM da_p, Vec P, AppCtx *user) {
 }
 
 PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
-  PetscReal total_flux_in = 0;
   PetscReal local_flux_out = 0;
   PetscReal global_flux_out = 0;
   Field** field;
   Vec u_local;
   PetscInt i,j,xs,ys,xm,ym,mx,my;
   PetscBool check = PETSC_TRUE;
-
-  // Calculate the total flux into the domain
-  for (j=0; j<user->grid->my; j++) {
-    total_flux_in += user->inlet_profile[j];
-  }
 
   DMDAGetGhostCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
   DMDAGetInfo(da, PETSC_IGNORE, &mx, &my, PETSC_IGNORE, PETSC_IGNORE,
@@ -230,8 +224,8 @@ PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
   MPI_Allreduce(&local_flux_out, &global_flux_out, 1, MPI_DOUBLE, MPI_SUM,
                 PETSC_COMM_WORLD);
 
-  if (total_flux_in != global_flux_out) {
-    PetscReal factor = total_flux_in/global_flux_out;
+  PetscReal factor = user->total_flux_in/global_flux_out;
+  if (user->total_flux_in != global_flux_out) {
     PetscPrintf(PETSC_COMM_WORLD,"Correction Factor for Outlet:\t%1.8f\n",
                 factor);
     if (factor < 0) {
@@ -247,7 +241,7 @@ PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
       if (i==mx) {
-        field[j][i].u *= total_flux_in/global_flux_out;
+        field[j][i].u *= factor;
       }
     }
   }

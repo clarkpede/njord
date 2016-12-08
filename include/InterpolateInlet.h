@@ -8,7 +8,8 @@
 #ifndef INCLUDE_INTERPOLATEINLET_H_
 #define INCLUDE_INTERPOLATEINLET_H_
 
-PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U);
+PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U,
+                          PetscReal *sum);
 
 
 
