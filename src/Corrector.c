@@ -49,7 +49,7 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
       if (j != 0) { // Don't correct bottom wall
           vel[j][i].v -= dt*dpdy;
       } else {
-        vel[j][i].v = 0;
+        vel[j][i].v = user->profiles->inlet_v[j];
       }
       // Top wall is not represented by our truncated grid
     }
