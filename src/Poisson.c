@@ -54,7 +54,8 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
   // Use the multigrid preconditioner and the BiCGSTAB solver
   PC pc;
   KSPGetPC(ksp, &pc);
-  PCSetType(pc, PCMG);
+  PCSetType(pc, PCGAMG);
+  PCMGSetType(pc, PC_MG_KASKADE);
   KSPSetType(ksp, KSPBCGS);
 
   // Finish setting up ksp
