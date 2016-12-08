@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-#include <petscdmda.h>
+#include "petscdmda.h"
 
 #include "math.h"
 

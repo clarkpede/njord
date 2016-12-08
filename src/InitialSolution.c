@@ -17,6 +17,8 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
   PetscInt i, j, mx, my, xs, ys, xm, ym;
   Field **u;
   PetscReal hx, hy, x, y;
+  PetscReal blending;
+  PetscReal parabolic;
 
   DMDAGetInfo(da, PETSC_IGNORE, &mx, &my, PETSC_IGNORE, PETSC_IGNORE,
               PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE,
@@ -34,7 +36,9 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
     y = j*hy + hy/2.0;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx;
-      u[j][i].u  = user->inlet_profile[j];
+      blending = x/user->grid->Lx;
+      parabolic = -(y-4.5)*(y-4.5)/(4.5*4.5) + 1.0;
+      u[j][i].u  = parabolic*blending + (1.0-blending)*user->inlet_profile[j];
     }
   }
 
@@ -81,7 +85,7 @@ PetscErrorCode SetInitialPressure(DM da, Vec U, AppCtx *user) {
     y = j*hy + hy/2.0;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx + hx/2.0;
-      p[j][i]  = -0.25*(cos(2*x)+cos(2*y));
+      p[j][i]  = 0.0;
     }
   }
 

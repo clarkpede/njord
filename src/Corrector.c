@@ -41,8 +41,13 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
       // Add in the velocity correction.
       dpdx = (p[j][i]-p[j][i-1])/hx;
       dpdy = (p[j][i]-p[j-1][i])/hy;
-      vel[j][i].u -= dt*dpdx;
-      vel[j][i].v -= dt*dpdy;
+      if (i != 0) { // Don't correct Dirichlet BC at inlet
+        vel[j][i].u -= dt*dpdx;
+      }
+      if (j != 0) { // Don't correct bottom wall
+          vel[j][i].v -= dt*dpdy;
+      };
+      // Top wall is not represented by our truncated grid
     }
   }
 

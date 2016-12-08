@@ -21,7 +21,7 @@ PetscErrorCode SetGridDefaults(GridInfo *grid) {
 }
 
 PetscErrorCode SetParamDefaults(Parameters *param) {
-  param->nu = 0.05;
+  param->nu = 0.005;
   param->CFL = 0.6;
   param->verbose = PETSC_FALSE;
   param->write_output = PETSC_FALSE;

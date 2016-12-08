@@ -9,15 +9,15 @@
  *-----------------------------------------------------------------------------
  * U Control Volume
  *
-   * v_i-1,j+1       v_i,j+1
-   *  |^|--------------|^|
-   *   |                |
-   *   |                |
-   * p_i-1,j   u_ij    p_ij
-   *   |                |
-   *   |                |
-   *  |^|--------------|^|
-   * v_i-1,j          v_ij
+ * v_i-1,j+1       v_i,j+1
+ *  |^|--------------|^|
+ *   |                |
+ *   |                |
+ * p_i-1,j   u_ij    p_ij
+ *   |                |
+ *   |                |
+ *  |^|--------------|^|
+ * v_i-1,j          v_ij
  *
  *-----------------------------------------------------------------------------
  *
@@ -37,23 +37,24 @@
  */
 
 #include "TimeMarch.h"
+#include "math.h"
 
 PetscScalar get_FCu(Field **x, PetscReal hx, PetscReal hy,
                     PetscInt i, PetscInt j) {
   PetscReal      mN, mS, mE, mW;
   PetscReal      uN, uS, uE, uW;
 
-    // Mass flow rates for u control volume
-    mE =  0.5*hy*(x[j][i+1].u   + x[j][i].u);
-    mW = -0.5*hy*(x[j][i-1].u   + x[j][i].u);
-    mN =  0.5*hx*(x[j+1][i-1].v + x[j+1][i].v);
-    mS = -0.5*hx*(x[j][i-1].v   + x[j][i].v);
+  // Mass flow rates for u control volume
+  mE =  0.5*hy*(x[j][i+1].u   + x[j][i].u);
+  mW = -0.5*hy*(x[j][i-1].u   + x[j][i].u);
+  mN =  0.5*hx*(x[j+1][i-1].v + x[j+1][i].v);
+  mS = -0.5*hx*(x[j][i-1].v   + x[j][i].v);
 
-    // Interpolated u velocities
-    uE = 0.5*(x[j][i].u + x[j][i+1].u);
-    uW = 0.5*(x[j][i].u + x[j][i-1].u);
-    uN = 0.5*(x[j][i].u + x[j+1][i].u);
-    uS = 0.5*(x[j][i].u + x[j-1][i].u);
+  // Interpolated u velocities
+  uE = 0.5*(x[j][i].u + x[j][i+1].u);
+  uW = 0.5*(x[j][i].u + x[j][i-1].u);
+  uN = 0.5*(x[j][i].u + x[j+1][i].u);
+  uS = 0.5*(x[j][i].u + x[j-1][i].u);
 
   // U momentum convection, divided by area
   return  (mE*uE + mW*uW + mN*uN + mS*uS)/(hx*hy);
@@ -165,7 +166,7 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   // Compute function over the locally owned part of the grid
   for (j=ys; j<ys+ym; j++) {
     for (i=xs; i<xs+xm; i++) {
-      if (i==0 ) {
+      if (i==0) {
         // No need to update Dirichlet BC on inlet
         f[j][i].u = 0;
       } else {
@@ -173,7 +174,7 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
         FDu = get_FDu(x,hx,hy,i,j,user->param->nu);
         f[j][i].u = -FCu + FDu;
       }
-      if (j==0 || j==My-1) {
+      if (j==0) {
         f[j][i].v = 0;
       } else {
         FCv = get_FCv(x,hx,hy,i,j);
@@ -190,6 +191,42 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   DMDAVecRestoreArray(da,F,&f);
   DMRestoreLocalVector(da,&localX);
   PetscFunctionReturn(0);
+}
+
+PetscErrorCode CheckUGhost(DM da, Vec U, AppCtx* user) {
+  Field** field;
+  Vec u_local;
+  PetscInt i,j,xs,ys,xm,ym,mx,my;
+  PetscBool check = PETSC_TRUE;
+  PetscReal diff, max_diff = 0;
+
+  DMDAGetGhostCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
+
+  // Get a local array, including ghost points
+  DMGetLocalVector(da, &u_local);
+  DMGlobalToLocalBegin(da, U, INSERT_VALUES, u_local);
+  DMGlobalToLocalEnd  (da, U, INSERT_VALUES, u_local);
+  DMDAVecGetArray(da,u_local,&field);
+
+  // x and y are locations of the center of the boundary, NOT the cell center
+  for (j=ys; j<ys+ym; j++) {
+    for (i=xs; i<xs+xm; i++) {
+      if (i == user->grid->mx-1 && j>=0 && j<user->grid->mx) {
+        diff = fabs(field[j][i].u - field[j][i+1].u);
+        if (diff > max_diff) max_diff = diff;
+      }
+    }
+  }
+
+
+  DMDAVecRestoreArray(da,u_local,&field);
+  DMLocalToGlobalBegin(da, u_local, INSERT_VALUES, U);
+  DMLocalToGlobalEnd  (da, u_local, INSERT_VALUES, U);
+  DMRestoreLocalVector(da, &u_local);
+
+  PetscPrintf(PETSC_COMM_WORLD, "Outflow derivative = 0?\t %.14f \n",max_diff);
+
+  return 0;
 }
 
 /**
@@ -266,7 +303,7 @@ PetscErrorCode Prestage(TS ts, PetscReal stagetime) {
 }
 
 PetscErrorCode PressureCorrection(TS ts) {
-  PetscReal dt;
+  PetscReal dt, time;
   DM da_vel, da_p;
   AppCtx* user;
   PetscInt timestep_number;
@@ -277,12 +314,12 @@ PetscErrorCode PressureCorrection(TS ts) {
 
   // Unpack the application state from TS
   TSGetTimeStep(ts, &dt);
+  TSGetTime(ts, &time);
   TSGetTimeStepNumber(ts, &timestep_number);
   TSGetDM(ts, &da_vel);
   DMDAGetReducedDMDA(da_vel, 1, &da_p);
   DMSetApplicationContext(da_p,user);
 
-  // Update the convective outflow BC so the domain is mass-conserving
   CorrectMassFluxAtOutlet(da_vel, user->vel, user);
 
   // Solves the Poisson equation and stores the result in user->p
@@ -292,7 +329,6 @@ PetscErrorCode PressureCorrection(TS ts) {
   CorrectVelocities(da_vel, da_p, dt, user);
 
   return 0;
-
 };
 
 /** Advances the solution forward in time.
@@ -339,12 +375,20 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSSetApplicationContext(*ts, user);
   TSSetFromOptions(*ts);
 
-  // Set up the Jacobian, if an implicit method is to be used
   TSGetType(*ts, &time_scheme);
   if (strcmp(time_scheme,TSCN) || strcmp(time_scheme,TSBEULER)) {
+    // Set up the Jacobian, if an implicit method is to be used
     DMCreateMatrix(da_vel,&Jac);
     MatCreateSNESMF(snes,&Jmf);
     SNESSetJacobian(snes,Jmf,Jac,SNESComputeJacobianDefaultColor,0);
+
+  } else if (strcmp(time_scheme,TSRK)) {
+    // Runge-kutta methods can use adaptive time stepping for error control
+    // We impose an admittedly arbitrary limit on the timestepping to keep
+    // the solution stable.
+    TSAdapt adapt;
+    TSGetAdapt(*ts, &adapt);
+    TSAdaptSetStepLimits(adapt,0.0,dt/user->param->CFL);
   }
 
   // Print the information about the time-stepper

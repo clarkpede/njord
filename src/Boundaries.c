@@ -100,7 +100,7 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
       } else if (bc==TOP) {
         x = i*hx; y = my*hy;
         field[j][i].u = 2*(-dt*dpdx) - field[j-1][i].u;
-      } else if (bc==RIGHT) {
+      } else if (i==mx) {
         // Convection outflow
         field[j][i].u = field[j][i-1].u;
       }
@@ -130,7 +130,7 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
       } else if (bc==LEFT) {
         x = 0; y = j*hy;
         field[j][i].v = 2*(-dt*dpdy) - field[j][i+1].v;
-      } else if (bc==RIGHT) {
+      } else if (i==mx) {
         // Convection outflow
         field[j][i].v = field[j][i-1].v;
       }
@@ -197,35 +197,65 @@ PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
   PetscReal total_flux_in = 0;
   PetscReal local_flux_out = 0;
   PetscReal global_flux_out = 0;
-  PetscInt mx, my;
-  PetscInt i,j,xs,ys,xm,ym;
   Field** field;
+  Vec u_local;
+  PetscInt i,j,xs,ys,xm,ym,mx,my;
+  PetscBool check = PETSC_TRUE;
 
-  // Get the domain size
+  // Calculate the total flux into the domain
+  for (j=0; j<user->grid->my; j++) {
+    total_flux_in += user->inlet_profile[j];
+  }
+
+  DMDAGetGhostCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
   DMDAGetInfo(da, PETSC_IGNORE, &mx, &my, PETSC_IGNORE, PETSC_IGNORE,
               PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE,
               PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE, PETSC_IGNORE);
 
-  // Calculate the total flux into the domain
-  for (j=0; j<my; j++) {
-    total_flux_in += user->inlet_profile[j];
-  }
+  // Get a local array, including ghost points
+  DMGetLocalVector(da, &u_local);
+  DMGlobalToLocalBegin(da, U, INSERT_VALUES, u_local);
+  DMGlobalToLocalEnd  (da, U, INSERT_VALUES, u_local);
+  DMDAVecGetArray(da,u_local,&field);
 
-  DMDAGetCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
-  DMDAVecGetArray(da,U,&field);
-
-  for (j=0; j<my; j++) {
-    local_flux_out += field[j][mx-1].u;
+  // x and y are locations of the center of the boundary, NOT the cell center
+  for (j=ys; j<ys+ym; j++) {
+    for (i=xs; i<xs+xm; i++) {
+      if (i==mx-1) {
+        local_flux_out += field[j][i].u;
+      }
+    }
   }
 
   MPI_Allreduce(&local_flux_out, &global_flux_out, 1, MPI_DOUBLE, MPI_SUM,
                 PETSC_COMM_WORLD);
 
-  for (j=0; j<my; j++) {
-    field[j][mx-1].u *= total_flux_in/global_flux_out;
+  if (total_flux_in != global_flux_out) {
+    PetscReal factor = total_flux_in/global_flux_out;
+    PetscPrintf(PETSC_COMM_WORLD,"Correction Factor for Outlet:\t%1.8f\n",
+                factor);
+    if (factor < 0) {
+      PetscPrintf(PETSC_COMM_WORLD,
+                  "ERROR: Negative total mass flux at outlet observed.\n");
+    } else if (factor > 10 || factor < 0.1) {
+      PetscPrintf(PETSC_COMM_WORLD,
+                  "WARNING: Correction factor for outlet was unusual.\n");
+    }
   }
 
-  DMDAVecRestoreArray(da,U,&field);
+  // x and y are locations of the center of the boundary, NOT the cell center
+  for (j=ys; j<ys+ym; j++) {
+    for (i=xs; i<xs+xm; i++) {
+      if (i==mx) {
+        field[j][i].u *= total_flux_in/global_flux_out;
+      }
+    }
+  }
+
+  DMDAVecRestoreArray(da,u_local,&field);
+  DMLocalToGlobalBegin(da, u_local, INSERT_VALUES, U);
+  DMLocalToGlobalEnd  (da, u_local, INSERT_VALUES, U);
+  DMRestoreLocalVector(da, &u_local);
 
   return 0;
 }
