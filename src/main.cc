@@ -24,6 +24,7 @@ int main(int argc, char* argv[]) {
   AppCtx *user;      // User defined work context
   Parameters param;  // Physical and other parameters
   GridInfo grid;     // Parameters defining the grid
+  BoundaryProfiles profiles; // Inlet and outlet profiles
   PetscErrorCode ierr;
 
   PetscInitialize(&argc, &argv,(char*)0, help);
@@ -36,11 +37,10 @@ int main(int argc, char* argv[]) {
   PetscNew(&user);
   user->param = &param;
   user->grid =  &grid;
+  user->profiles = &profiles;
 
-  // Set up the inlet profile
-  PetscMalloc1(user->grid->my, &user->inlet_profile);
-  GetInflowU(user->grid->dy, user->grid->my, user->inlet_profile,
-             &user->total_flux_in);
+  // Set up the inlet and outlet profiles
+  BuildInflowOutflowProfiles(user->grid->dy, user->grid->my, user->profiles);
 
   // Create a distributed array for the velocities
   DMDACreate2d(PETSC_COMM_WORLD, grid.bc_x, grid.bc_y, grid.stencil,
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
   // Cleanup
   VecDestroy(&user->vel);
   VecDestroy(&user->p);
-  PetscFree(user->inlet_profile);
+  FreeProfiles(user->profiles);
   PetscFree(user);
   DMDestroy(&da_vel);
   DMDestroy(&da_p);

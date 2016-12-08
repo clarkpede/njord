@@ -44,7 +44,7 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
       if (i != 0) { // Don't correct Dirichlet BC at inlet
         vel[j][i].u -= dt*dpdx;
       } else {
-        vel[j][i].u = user->inlet_profile[j];
+        vel[j][i].u = user->profiles->inlet_u[j];
       }
       if (j != 0) { // Don't correct bottom wall
           vel[j][i].v -= dt*dpdy;

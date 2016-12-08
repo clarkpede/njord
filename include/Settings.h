@@ -31,15 +31,25 @@ typedef struct {
   PetscInt dof;              // For this problem 4: u, v, p, & vt
 } GridInfo;
 
+// The interpolated profiles for the inlet, outlet
+typedef struct {
+  PetscReal* inlet_u;
+  PetscReal* inlet_v;
+  PetscReal* outlet_u;
+  PetscReal* outlet_v;
+  PetscReal total_flux_in;
+} BoundaryProfiles;
+
 // The application context
 typedef struct {
-  Parameters*   param;    // Runtime parameters
-  GridInfo*     grid;     // Grid information
-  Vec           vel, p; // Vectors representing the solution at each time step
-  PetscReal*    inlet_profile;
-  PetscReal     total_flux_in;
-  PetscLogEvent current_event;
+  Parameters*       param;    // Runtime parameters
+  GridInfo*         grid;     // Grid information
+  Vec               vel, p; // Vectors representing the solution at each time step
+  BoundaryProfiles* profiles;
+  PetscLogEvent     current_event;
 } AppCtx;
+
+
 
 #ifdef __cplusplus
 extern "C" {

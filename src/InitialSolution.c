@@ -37,9 +37,8 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
     for (i=xs; i<xs+xm; i++) {
       x = i*hx;
       blending = pow((1.0-x/user->grid->Lx),5.0);
-      outlet_profile = -0.5*(y-1)*(y-1) + 0.5;
-      u[j][i].u  = blending*user->inlet_profile[j]
-                   + (1.0-blending)*outlet_profile;
+      u[j][i].u  =         blending*user->profiles->inlet_u[j]
+                   + (1.0-blending)*user->profiles->outlet_u[j];
     }
   }
 
@@ -48,7 +47,9 @@ PetscErrorCode SetInitialVelocities(DM da, Vec U, AppCtx *user) {
     y = j*hy;
     for (i=xs; i<xs+xm; i++) {
       x = i*hx + hx/2.0;
-      u[j][i].v  = 0.0;
+      blending = pow((1.0-x/user->grid->Lx),5.0);
+      u[j][i].v  =         blending*user->profiles->inlet_v[j]
+                   + (1.0-blending)*user->profiles->outlet_v[j];
     }
   }
 

@@ -8,9 +8,14 @@
 #ifndef INCLUDE_INTERPOLATEINLET_H_
 #define INCLUDE_INTERPOLATEINLET_H_
 
-PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U,
-                          PetscReal *sum);
+#include <petscsys.h>
 
+#include "Settings.h"
+#include "spline.h"
 
+PetscErrorCode BuildInflowOutflowProfiles(PetscReal hy, PetscInt my,
+                                          BoundaryProfiles* profiles);
+
+PetscErrorCode FreeProfiles(BoundaryProfiles* profiles);
 
 #endif /* INCLUDE_INTERPOLATEINLET_H_ */

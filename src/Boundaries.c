@@ -96,10 +96,10 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
 
       if (bc==BOTTOM) {
         x = i*hx; y = 0;
-        field[j][i].u = 2*(-dt*dpdx) - field[j+1][i].u;
+        field[j][i].u = 2*(dt*dpdx) - field[j+1][i].u;
       } else if (bc==TOP) {
         x = i*hx; y = my*hy;
-        field[j][i].u = 2*(-dt*dpdx) - field[j-1][i].u;
+        field[j][i].u = 2*(dt*dpdx) - field[j-1][i].u;
       } else if (i==mx) {
         // Convection outflow
         field[j][i].u = field[j][i-1].u;
@@ -129,7 +129,7 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
         field[j][i].v = (-dt*dpdy);
       } else if (bc==LEFT) {
         x = 0; y = j*hy;
-        field[j][i].v = 2*(-dt*dpdy) - field[j][i+1].v;
+        field[j][i].v = 2*(user->profiles->inlet_u[j]+dt*dpdy) - field[j][i+1].v;
       } else if (i==mx) {
         // Convection outflow
         field[j][i].v = field[j][i-1].v;
@@ -224,8 +224,8 @@ PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
   MPI_Allreduce(&local_flux_out, &global_flux_out, 1, MPI_DOUBLE, MPI_SUM,
                 PETSC_COMM_WORLD);
 
-  PetscReal factor = user->total_flux_in/global_flux_out;
-  if (user->total_flux_in != global_flux_out) {
+  PetscReal factor = user->profiles->total_flux_in/global_flux_out;
+  if (factor != 1.0) {
     PetscPrintf(PETSC_COMM_WORLD,"Correction Factor for Outlet:\t%1.8f\n",
                 factor);
     if (factor < 0) {
@@ -233,7 +233,7 @@ PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
                   "ERROR: Negative total mass flux at outlet observed.\n");
     } else if (factor > 10 || factor < 0.1) {
       PetscPrintf(PETSC_COMM_WORLD,
-                  "WARNING: Correction factor for outlet was unusual.\n");
+                  "WARNING: Outlet velocity is being over-corrected.\n");
     }
   }
 
