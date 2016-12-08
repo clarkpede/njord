@@ -18,61 +18,66 @@ extern PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt,
                                         AppCtx *user, PetscReal (*opt_func)
                                         (PetscReal, PetscReal));
 
+// Set up the Poisson solver context only once, to avoid excessive memory
+// allocation / deallocation
+PetscErrorCode InitializePoissonContext(DM da, PoissonCtx* ctx, AppCtx* user) {
+  KSPCreate(PETSC_COMM_WORLD, &ctx->ksp);
+
+  // Set up the null space (used to make Neumann BCs consistent
+  MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, 0, &ctx->nullspace);
+
+  // Create the constant matrix for solving a Poisson equation
+  DMCreateMatrix(da, &ctx->poisson_matrix);
+  DMCreateMatrix(da, &ctx->poisson_matrix);
+  SetUpPoissonMatrix(da, ctx->poisson_matrix, ctx->nullspace, user);
+  KSPSetOperators(ctx->ksp, ctx->poisson_matrix, ctx->poisson_matrix);
+
+  // Initialize the RHS matrix
+  VecDuplicate(user->p, &ctx->RHS);
+
+  KSPSetDM(ctx->ksp, da); // Sets the DM used by preconditioners
+  KSPSetDMActive(ctx->ksp, PETSC_FALSE); // Tells KSP to keep our matrix
+  // Use what's stored in the pressure as our initial guess:
+  KSPSetInitialGuessNonzero(ctx->ksp,PETSC_TRUE);
+
+  // Use the multigrid preconditioner and the BiCGSTAB solver
+  PC pc;
+  KSPGetPC(ctx->ksp, &pc);
+  PCSetType(pc, PCGAMG);
+  PCMGSetType(pc, PC_MG_KASKADE);
+  KSPSetType(ctx->ksp, KSPBCGS);
+
+  // Finish setting up ksp
+  KSPSetFromOptions(ctx->ksp);
+  KSPSetUp(ctx->ksp);
+
+  return 0;
+}
+
+PetscErrorCode FreePoissonContext(PoissonCtx* ctx) {
+  VecDestroy(&ctx->RHS);
+  MatNullSpaceDestroy(&ctx->nullspace);
+  MatDestroy(&ctx->poisson_matrix);
+  KSPDestroy(&ctx->ksp);
+  return 0;
+}
+
 #undef __FUNCT__
 #define __FUNCT__ "SolvePoisson"
 PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
                               AppCtx *user,
                               PetscReal (*opt_func)(PetscReal, PetscReal)) {
-  KSP ksp;
-  Mat poisson_matrix;
-  Vec RHS;
-  MatNullSpace nullspace;
   PetscLogEvent USER_EVENT;
 
   PetscLogEventRegister("Poisson Solver  ",0,&USER_EVENT);
   PetscLogEventBegin(USER_EVENT,0,0,0,0);
 
-  KSPCreate(PETSC_COMM_WORLD, &ksp);
-
-  // Set up the null space (used to make Neumann BCs consistent
-  MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, 0, &nullspace);
-
-  // Create the constant matrix for solving a Poisson equation
-  DMCreateMatrix(da_p, &poisson_matrix);
-  SetUpPoissonMatrix(da_p, poisson_matrix, nullspace, user);
-  //MatView(poisson_matrix, PETSC_VIEWER_STDOUT_WORLD);
-  KSPSetOperators(ksp, poisson_matrix, poisson_matrix);
-
   // Create the RHS with the calculated divergence of u
-  VecDuplicate(user->p, &RHS);
-  SetUpPoissonRHS(da_vel, da_p, dt, RHS, nullspace, user, opt_func);
-
-  KSPSetDM(ksp, da_p); // Sets the DM used by preconditioners
-  KSPSetDMActive(ksp, PETSC_FALSE); // Tells KSP to keep our matrix
-  KSPSetInitialGuessNonzero(ksp,PETSC_TRUE);
-
-  // Use the multigrid preconditioner and the BiCGSTAB solver
-  PC pc;
-  KSPGetPC(ksp, &pc);
-  PCSetType(pc, PCGAMG);
-  PCMGSetType(pc, PC_MG_KASKADE);
-  KSPSetType(ksp, KSPBCGS);
-
-  // Finish setting up ksp
-  KSPSetFromOptions(ksp);
-  KSPSetUp(ksp);
+  SetUpPoissonRHS(da_vel, da_p, dt, user->poisson_ctx->RHS,
+                  user->poisson_ctx->nullspace, user, opt_func);
 
   // Solve the system
-  KSPSolve(ksp,RHS,user->p);
-  if (user->param->verbose) {
-    PetscInt its;
-    KSPGetIterationNumber(ksp, &its);
-    PetscPrintf(PETSC_COMM_WORLD,
-                "Iterations used for Pressure-Poisson Eqn: %d\n", its);
-  }
-
-  VecDestroy(&RHS);
-  MatNullSpaceDestroy(&nullspace);
+  KSPSolve(user->poisson_ctx->ksp, user->poisson_ctx->RHS, user->p);
 
   PetscLogEventEnd(USER_EVENT,0,0,0,0);
 

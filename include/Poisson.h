@@ -21,6 +21,10 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal timestep,
                               AppCtx *user,
                               PetscReal (*opt_func)(PetscReal, PetscReal));
 
+PetscErrorCode InitializePoissonContext(DM da, PoissonCtx* ctx, AppCtx* user);
+
+PetscErrorCode FreePoissonContext(PoissonCtx* ctx);
+
 #ifdef __cplusplus
 }
 #endif

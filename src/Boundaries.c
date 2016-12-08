@@ -36,14 +36,6 @@ PetscErrorCode GetBoundaryType(PetscInt i, PetscInt j,PetscInt mx,
   return 0;
 }
 
-PetscReal BC_U(PetscReal x, PetscReal y, PetscReal t, PetscReal nu) {
-  return -cos(x)*sin(y)*exp(-2*nu*t);
-}
-
-PetscReal BC_V(PetscReal x, PetscReal y, PetscReal t, PetscReal nu) {
-  return sin(x)*cos(y)*exp(-2*nu*t);
-}
-
 PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
                                           PetscReal time, PetscReal dt,
                                           AppCtx *user) {
@@ -225,7 +217,7 @@ PetscErrorCode CorrectMassFluxAtOutlet(DM da, Vec U, AppCtx *user) {
   MPI_Allreduce(&local_flux_out, &global_flux_out, 1, MPI_DOUBLE, MPI_SUM,
                 PETSC_COMM_WORLD);
 
-  PetscReal factor = 1.00059988;
+  PetscReal factor = 1.00059988; // Hard-coded value
     if (factor < 0) {
       PetscPrintf(PETSC_COMM_WORLD,
                   "ERROR: Negative total mass flux at outlet observed.\n");

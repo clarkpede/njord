@@ -81,6 +81,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Cleanup
+  TSDestroy(&ts);
   VecDestroy(&user->vel);
   VecDestroy(&user->p);
   FreeProfiles(user->profiles);

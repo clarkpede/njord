@@ -358,8 +358,15 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   const PetscInt kMaxSteps = 800;
 
   TSType time_scheme;
+  PoissonCtx poisson_ctx;
   Mat Jac=NULL;
   Mat Jmf=NULL;
+
+  //---------------------------------------------------------------------------
+  // Initialize the poisson solver
+  //----------------------------------------------------------------------------
+  user->poisson_ctx = &poisson_ctx;
+  InitializePoissonContext(da_p, &poisson_ctx, user);
 
   //---------------------------------------------------------------------------
   // Set up timestepper
@@ -414,6 +421,8 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   TSSetPostStep(*ts, PressureCorrection);
 
   TSSolve(*ts, user->vel);
+
+  FreePoissonContext(&poisson_ctx);
 
   return 0;
 }

@@ -9,6 +9,7 @@
 #define INCLUDE_SETTINGS_H_
 
 #include <petscdmda.h>
+#include <petscksp.h>
 
 // All of the user-specified parameters that change execution
 typedef struct {
@@ -40,12 +41,20 @@ typedef struct {
   PetscReal total_flux_in;
 } BoundaryProfiles;
 
+typedef struct {
+  KSP           ksp;
+  Mat           poisson_matrix;
+  Vec           RHS;
+  MatNullSpace  nullspace;
+} PoissonCtx;
+
 // The application context
 typedef struct {
   Parameters*       param;    // Runtime parameters
   GridInfo*         grid;     // Grid information
   Vec               vel, p; // Vectors representing the solution at each time step
   BoundaryProfiles* profiles;
+  PoissonCtx*       poisson_ctx;
   PetscLogEvent     current_event;
 } AppCtx;
 
