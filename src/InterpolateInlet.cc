@@ -30,7 +30,8 @@ PetscErrorCode GetInflowU(PetscReal hy, PetscInt my, PetscReal *U) {
     if (y<1) {
       U[i] = 0.0;
     } else {
-      U[i] = interpolant(y);
+      U[i] = -4.0*(y-1.5)*(y-1.5) + 1;
+      //U[i] = interpolant(y);
     }
   };
 

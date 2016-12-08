@@ -89,9 +89,13 @@ PetscReal get_FDu(Field **x, PetscReal hx, PetscReal hy,
 
   // U diffusion from momentum equation:
   dUdxE = (x[j][i+1].u - x[j][i].u)/hx;
-  dUdxW = (x[j][i].u   - x[j][i-1].u)/hx;
   dUdyN = (x[j+1][i].u - x[j][i].u)/hy;
   dUdyS = (x[j][i].u   - x[j-1][i].u)/hy;
+  if (j == 0 && (i+0.5)*hx <= 1.0) {
+    dUdxW =0;
+  } else {
+    dUdxW = (x[j][i].u   - x[j][i-1].u)/hx;
+  };
 
   FDu = nu * (dUdxE*hy - dUdxW*hy + dUdyN*hx - dUdyS*hx);
   FDu /= (hx*hy);
@@ -99,15 +103,24 @@ PetscReal get_FDu(Field **x, PetscReal hx, PetscReal hy,
 }
 
 PetscReal get_FDv(Field **x, PetscReal hx, PetscReal hy,
-                  PetscInt i, PetscInt j, PetscReal nu) {
+                  PetscInt i, PetscInt j, PetscInt my, PetscReal nu) {
   PetscReal FDv;
   PetscReal dVdyN, dVdyS, dVdxE, dVdxW;
 
   // V momentum equation:
   dVdxE = (x[j][i+1].v - x[j][i].v)/hx;
   dVdxW = (x[j][i].v   - x[j][i-1].v)/hx;
-  dVdyN = (x[j+1][i].v - x[j][i].v)/hy;
-  dVdyS = (x[j][i].v   - x[j-1][i].v)/hy;
+  if (j == my-1) {
+    dVdyN = 0;
+  } else {
+    dVdyN = (x[j+1][i].v - x[j][i].v)/hy;
+  }
+
+  if (j==0) {
+    dVdyS = 0;
+  } else {
+    dVdyS = (x[j][i].v   - x[j-1][i].v)/hy;
+  }
 
   FDv = nu * (dVdxE*hy - dVdxW*hy + dVdyN*hx - dVdyS*hx);
   FDv /= (hx*hy);
@@ -178,7 +191,7 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
         f[j][i].v = 0;
       } else {
         FCv = get_FCv(x,hx,hy,i,j);
-        FDv = get_FDv(x,hx,hy,i,j,user->param->nu);
+        FDv = get_FDv(x,hx,hy,i,j,user->grid->my,user->param->nu);
         f[j][i].v = -FCv + FDv;
       }
     }
@@ -243,17 +256,17 @@ PetscErrorCode CheckUGhost(DM da, Vec U, AppCtx* user) {
 PetscErrorCode get_dt(DM da, Vec U, PetscReal* dt, AppCtx* user){
   PetscReal max_vel;
   PetscInt  mx, my;
-  PetscReal hx, hy;
+  PetscReal dx;
   PetscReal dt_conv, dt_diff;
 
-  hx = user->grid->dx;
+  dx = ((user->grid->dx < user->grid->dy) ? user->grid->dx : user->grid->dy);
 
   // Stability limit for Euler forward with linear convection
   VecMax(U,NULL,&max_vel);
-  dt_conv = user->param->CFL*hx/(max_vel);
+  dt_conv = user->param->CFL*dx/(max_vel);
 
   // Stability limit for Euler forward with linear diffusion
-  dt_diff = user->param->CFL*(hx*hx)/user->param->nu;
+  dt_diff = user->param->CFL*(dx*dx)/user->param->nu;
 
   // Set the smaller of the two as an output
   *dt = ((dt_conv < dt_diff) ? dt_conv: dt_diff);

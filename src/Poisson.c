@@ -49,8 +49,9 @@ PetscErrorCode SolvePoisson(DM da_vel, DM da_p, PetscReal dt,
 
   KSPSetDM(ksp, da_p); // Sets the DM used by preconditioners
   KSPSetDMActive(ksp, PETSC_FALSE); // Tells KSP to keep our matrix
+  KSPSetInitialGuessNonzero(ksp,PETSC_TRUE);
 
-  // Use the Jacobian preconditioner and the BiCGSTAB solver
+  // Use the multigrid preconditioner and the BiCGSTAB solver
   PC pc;
   KSPGetPC(ksp, &pc);
   PCSetType(pc, PCMG);

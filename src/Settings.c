@@ -8,10 +8,10 @@
 #include "Settings.h"
 
 PetscErrorCode SetGridDefaults(GridInfo *grid) {
-  grid->mx = 240;
-  grid->my = 60;
-  grid->Lx = 36.0;
-  grid->Ly = 9.0;
+  grid->mx = 750;
+  grid->my = 50;
+  grid->Lx = 30.0;
+  grid->Ly = 2.0;
   grid->stencil = DMDA_STENCIL_STAR;
   grid->bc_x = DM_BOUNDARY_GHOSTED;
   grid->bc_y = DM_BOUNDARY_GHOSTED;
@@ -21,7 +21,7 @@ PetscErrorCode SetGridDefaults(GridInfo *grid) {
 }
 
 PetscErrorCode SetParamDefaults(Parameters *param) {
-  param->nu = 0.005;
+  param->nu = 0.01;
   param->CFL = 0.6;
   param->verbose = PETSC_FALSE;
   param->write_output = PETSC_FALSE;

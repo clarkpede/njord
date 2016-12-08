@@ -67,7 +67,7 @@ PetscErrorCode Monitor(TS ts,PetscInt step,PetscReal time,Vec u, void *ctx) {
     PetscViewerDestroy(&viewer);
   }
 
-  PetscPrintf(PETSC_COMM_WORLD,"step #: %D,\t step size = %g,\t time = %g,\t max = %g,\t mean = %g\n",step,(double)dt,(double)time, maxim, mean);
+  PetscPrintf(PETSC_COMM_WORLD,"step #: %D,\t step size = %.4f,\t time = %.2f,\t max = %.6f,\t mean = %.6f\n",step,(double)dt,(double)time, maxim, mean);
 
   return 0;
 }
