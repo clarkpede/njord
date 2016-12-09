@@ -136,6 +136,7 @@ PetscErrorCode UpdateBoundaryConditionsUV(DM da_vel, DM da_p, Vec U, Vec P,
   DMRestoreLocalVector(da_vel, &u_local);
 
   DMDAVecRestoreArrayRead(da_p,   local_p,   &p);
+  DMRestoreLocalVector(da_p, &local_p);
 
   return 0;
 };

@@ -210,5 +210,7 @@ PetscErrorCode SetUpPoissonRHS(DM da_vel, DM da_p, PetscReal dt, Vec RHS,
   // a consistent RHS
   MatNullSpaceRemove(nullspace,RHS);
 
+  DMRestoreLocalVector(da_vel, &local_vel);
+
   return 0;
 }

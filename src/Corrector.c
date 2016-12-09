@@ -59,6 +59,8 @@ PetscErrorCode CorrectVelocities(DM da_vel, DM da_p, PetscReal dt,
   DMDAVecRestoreArrayRead(da_p,   local_p,   &p);
   DMDAVecRestoreArray    (da_vel, user->vel, &vel);
 
+  DMRestoreLocalVector(da_p, &local_p);
+
   PetscLogEventEnd(USER_EVENT,0,0,0,0);
 
   return 0;

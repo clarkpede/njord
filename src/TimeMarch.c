@@ -206,42 +206,6 @@ PetscErrorCode FormTimeDerivativeFunction(TS ts, PetscReal ftime, Vec X, Vec F, 
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode CheckUGhost(DM da, Vec U, AppCtx* user) {
-  Field** field;
-  Vec u_local;
-  PetscInt i,j,xs,ys,xm,ym,mx,my;
-  PetscBool check = PETSC_TRUE;
-  PetscReal diff, max_diff = 0;
-
-  DMDAGetGhostCorners(da,&xs,&ys,NULL,&xm,&ym,NULL); // Get local grid boundaries
-
-  // Get a local array, including ghost points
-  DMGetLocalVector(da, &u_local);
-  DMGlobalToLocalBegin(da, U, INSERT_VALUES, u_local);
-  DMGlobalToLocalEnd  (da, U, INSERT_VALUES, u_local);
-  DMDAVecGetArray(da,u_local,&field);
-
-  // x and y are locations of the center of the boundary, NOT the cell center
-  for (j=ys; j<ys+ym; j++) {
-    for (i=xs; i<xs+xm; i++) {
-      if (i == user->grid->mx-1 && j>=0 && j<user->grid->mx) {
-        diff = fabs(field[j][i].u - field[j][i+1].u);
-        if (diff > max_diff) max_diff = diff;
-      }
-    }
-  }
-
-
-  DMDAVecRestoreArray(da,u_local,&field);
-  DMLocalToGlobalBegin(da, u_local, INSERT_VALUES, U);
-  DMLocalToGlobalEnd  (da, u_local, INSERT_VALUES, U);
-  DMRestoreLocalVector(da, &u_local);
-
-  PetscPrintf(PETSC_COMM_WORLD, "Outflow derivative = 0?\t %.14f \n",max_diff);
-
-  return 0;
-}
-
 /**
  *
  * @param da - The distributed array used for the data.
@@ -293,6 +257,8 @@ PetscErrorCode Prestep(TS ts) {
   PetscLogEventRegister("Time Integration",0,&user->current_event);
   PetscLogEventBegin(user->current_event,0,0,0,0);
 
+  UpdateBoundaryConditionsUV(da_vel, da_p, user->vel, user->p, time, dt, user);
+
   return 0;
 }
 
@@ -309,8 +275,6 @@ PetscErrorCode Prestage(TS ts, PetscReal stagetime) {
 
   TSGetTimeStep(ts, &dt);
   TSGetTime(ts,&time);
-
-  UpdateBoundaryConditionsUV(da_vel, da_p, user->vel, user->p, time, dt, user);
 
   return 0;
 }
@@ -417,7 +381,7 @@ PetscErrorCode TimeMarch(TS* ts, DM da_vel, DM da_p, AppCtx *user) {
   // Use a pre-step so we can update BCs and set a variable time step
   // Use the pressure correction as a post-step
   TSSetPreStep(*ts, Prestep);
-  TSSetPreStage(*ts,Prestage);
+//  TSSetPreStage(*ts,Prestage);
   TSSetPostStep(*ts, PressureCorrection);
 
   TSSolve(*ts, user->vel);
